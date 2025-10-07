@@ -17,12 +17,18 @@ var last_platform = null
 var screen_width: int = 800
 var player_radius: float = 16.0
 
+# Customization
+var ball_color: Color = Color(0.29, 0.62, 1.0)
+
 # Signals
 signal landed_on_platform(platform)
 signal attempted_edge_escape()
 signal jumped(is_manual: bool)
 
 func _ready():
+	# Get ball color from GameManager
+	ball_color = GameManager.get_ball_color()
+
 	# Set up collision shape
 	var collision = CollisionShape2D.new()
 	var circle = CircleShape2D.new()
@@ -34,9 +40,9 @@ func _ready():
 	queue_redraw()
 
 func _draw():
-	# Draw ball
-	draw_circle(Vector2.ZERO, player_radius, Color(0.29, 0.62, 1.0))  # Neon blue
-	draw_arc(Vector2.ZERO, player_radius, 0, TAU, 32, Color(0.5, 0.8, 1.0), 2.0)
+	# Draw ball with custom color
+	draw_circle(Vector2.ZERO, player_radius, ball_color)
+	draw_arc(Vector2.ZERO, player_radius, 0, TAU, 32, ball_color.lightened(0.3), 2.0)
 
 func _physics_process(delta):
 	# Apply gravity

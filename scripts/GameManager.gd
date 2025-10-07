@@ -58,6 +58,7 @@ func load_or_create_profile():
 func create_default_profile() -> Dictionary:
 	return {
 		"username": "Player",
+		"ball_color": Color(0.29, 0.62, 1.0).to_html(),  # Neon blue as hex
 		"high_score": 0,
 		"total_runs": 0,
 		"platforms_landed": 0,
@@ -71,6 +72,21 @@ func create_default_profile() -> Dictionary:
 		"created_timestamp": Time.get_unix_time_from_system(),
 		"last_played": Time.get_unix_time_from_system()
 	}
+
+func update_username(new_name: String):
+	current_profile.username = new_name
+	save_profile()
+	profile_loaded.emit(current_profile)
+
+func update_ball_color(new_color: Color):
+	current_profile.ball_color = new_color.to_html()
+	save_profile()
+	profile_loaded.emit(current_profile)
+
+func get_ball_color() -> Color:
+	if current_profile.has("ball_color"):
+		return Color.html(current_profile.ball_color)
+	return Color(0.29, 0.62, 1.0)  # Default neon blue
 
 func save_profile():
 	current_profile.last_played = Time.get_unix_time_from_system()

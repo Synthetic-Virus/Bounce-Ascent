@@ -2,6 +2,7 @@ extends Control
 
 var title_label: Label
 var play_button: Button
+var profile_button: Button
 var quit_button: Button
 var profile_info: Label
 
@@ -48,6 +49,14 @@ func _ready():
 	play_button.pressed.connect(_on_play_pressed)
 	container.add_child(play_button)
 
+	# Profile button
+	profile_button = Button.new()
+	profile_button.text = "PROFILE"
+	profile_button.custom_minimum_size = Vector2(200, 50)
+	profile_button.add_theme_font_size_override("font_size", 24)
+	profile_button.pressed.connect(_on_profile_pressed)
+	container.add_child(profile_button)
+
 	# Quit button
 	quit_button = Button.new()
 	quit_button.text = "QUIT"
@@ -67,9 +76,9 @@ func update_profile_info():
 		return
 
 	var profile = GameManager.current_profile
-	var info_text = "Player: " + profile.username + "\n"
-	info_text += "High Score: " + str(profile.high_score) + "\n"
-	info_text += "Total Runs: " + str(profile.total_runs)
+	var username = profile.username if profile.username != "" else "Player"
+	var info_text = "Player: " + username + "\n"
+	info_text += "High Score: " + str(profile.high_score)
 	profile_info.text = info_text
 
 func _on_profile_loaded(_profile):
@@ -77,6 +86,15 @@ func _on_profile_loaded(_profile):
 
 func _on_play_pressed():
 	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+
+func _on_profile_pressed():
+	# Open profile editor as an overlay
+	var profile_editor = load("res://scenes/ProfileEditor.tscn").instantiate()
+	add_child(profile_editor)
+
+	# Update profile info when editor closes
+	await profile_editor.tree_exited
+	update_profile_info()
 
 func _on_quit_pressed():
 	get_tree().quit()

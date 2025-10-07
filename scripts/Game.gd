@@ -5,9 +5,12 @@ var player: CharacterBody2D
 var camera: Camera2D
 var platform_spawner: Node2D
 var ui: CanvasLayer
+var countdown_label: Label
 
 # Game state
 var game_active: bool = false
+var countdown_active: bool = false
+var countdown_time: float = 3.0
 
 func _ready():
 	# Create background
@@ -50,8 +53,11 @@ func _ready():
 	# Set player camera reference
 	camera.set_player(player)
 
-	# Start game
-	start_game()
+	# Create countdown label
+	create_countdown_label()
+
+	# Start countdown instead of immediate game
+	start_countdown()
 
 func start_game():
 	game_active = true
@@ -65,7 +71,40 @@ func start_game():
 	# Start camera scrolling
 	camera.start_scrolling()
 
+func create_countdown_label():
+	countdown_label = Label.new()
+	countdown_label.add_theme_font_size_override("font_size", 120)
+	countdown_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	countdown_label.position = Vector2(300, 400)
+	countdown_label.size = Vector2(200, 200)
+	countdown_label.z_index = 200
+	countdown_label.visible = false
+	add_child(countdown_label)
+
+func start_countdown():
+	countdown_active = true
+	countdown_time = 3.0
+	countdown_label.visible = true
+
+	# Spawn platforms but don't start scrolling yet
+	platform_spawner.spawn_initial_platforms()
+
 func _process(delta):
+	# Handle countdown
+	if countdown_active:
+		countdown_time -= delta
+		if countdown_time > 0:
+			countdown_label.text = str(int(ceil(countdown_time)))
+		else:
+			countdown_label.text = "GO!"
+			if countdown_time < -0.5:  # Show GO! for 0.5 seconds
+				countdown_label.visible = false
+				countdown_active = false
+				start_game()
+		return
+
 	if not game_active:
 		return
 
@@ -99,7 +138,12 @@ func end_game(death_type: String):
 	show_game_over_screen()
 
 func show_game_over_screen():
-	get_tree().change_scene_to_file("res://scenes/GameOver.tscn")
+	# Store stats in GameManager for GameOver scene to access
+	var game_over_scene = load("res://scenes/GameOver.tscn").instantiate()
+	game_over_scene.stats = GameManager.session_stats.duplicate()
+	get_tree().root.add_child(game_over_scene)
+	get_tree().current_scene.queue_free()
+	get_tree().current_scene = game_over_scene
 
 func add_crt_shader():
 	# Create a CanvasLayer for the CRT shader
