@@ -1,0 +1,57 @@
+# Godot 4+ specific ignores
+.godot/
+.import/
+
+# Godot-specific
+*.import
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# System/tool-specific ignores
+.DS_Store
+*.swp
+*.swo
+*~
+*.tmp
+
+# Build artifacts
+exports/
+*.exe
+*.pck
+*.zip
+*.dmg
+*.app
+*.apk
+*.x86_64
+*.x86
+
+# IDE specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# User data (save files during development)
+# Note: The actual user save files will be in the OS-specific user data directory
+# This is just for any test saves in the project folder
+*.save
+user://
+
+# Logs
+*.log
+
+# Encryption keys (IMPORTANT: Never commit actual encryption keys!)
+# This is just a precaution - our keys are in code
+encryption_key.txt
+
+# OS-specific
+Thumbs.db
+desktop.ini
+
+# Temporary files
+tmp/
+temp/

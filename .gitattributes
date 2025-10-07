@@ -1,0 +1,31 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Godot-specific files
+*.gd text eol=lf
+*.tscn text eol=lf merge=union
+*.tres text eol=lf merge=union
+*.godot text eol=lf
+*.cfg text eol=lf
+*.import text eol=lf
+
+# Shaders
+*.gdshader text eol=lf
+*.shader text eol=lf
+
+# Documentation
+*.md text eol=lf
+
+# Scripts
+*.sh text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.svg binary
+*.ico binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
