@@ -41,11 +41,20 @@ func _ready():
 
 func _draw():
 	if is_active:
-		# Draw platform rectangle
+		# Draw rounded platform
+		var corner_radius = 8.0
 		var rect = Rect2(-platform_width / 2, -platform_height / 2, platform_width, platform_height)
-		draw_rect(rect, platform_color)
-		# Draw border
-		draw_rect(rect, platform_color.lightened(0.3), false, 2.0)
+
+		# Draw rounded rectangle (approximation using multiple shapes)
+		draw_rect(Rect2(rect.position.x + corner_radius, rect.position.y, rect.size.x - corner_radius * 2, rect.size.y), platform_color)
+		draw_rect(Rect2(rect.position.x, rect.position.y + corner_radius, corner_radius, rect.size.y - corner_radius * 2), platform_color)
+		draw_rect(Rect2(rect.position.x + rect.size.x - corner_radius, rect.position.y + corner_radius, corner_radius, rect.size.y - corner_radius * 2), platform_color)
+
+		# Draw corner circles
+		draw_circle(Vector2(rect.position.x + corner_radius, rect.position.y + corner_radius), corner_radius, platform_color)
+		draw_circle(Vector2(rect.position.x + rect.size.x - corner_radius, rect.position.y + corner_radius), corner_radius, platform_color)
+		draw_circle(Vector2(rect.position.x + corner_radius, rect.position.y + rect.size.y - corner_radius), corner_radius, platform_color)
+		draw_circle(Vector2(rect.position.x + rect.size.x - corner_radius, rect.position.y + rect.size.y - corner_radius), corner_radius, platform_color)
 
 func on_player_land():
 	# Override in specific platform types

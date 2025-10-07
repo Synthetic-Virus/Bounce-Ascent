@@ -33,9 +33,12 @@ func set_camera(camera: Camera2D):
 	camera_ref = camera
 
 func spawn_initial_platforms():
+	# Spawn a starting platform right below player
+	spawn_platform_at_height(450, 0)  # Just below player at y=400
+
 	# Spawn platforms from bottom to top
-	for i in range(12):  # Spawn ~12 initial platforms
-		var y_pos = -i * INITIAL_VERTICAL_SPACING
+	for i in range(1, 13):  # Spawn ~12 more platforms going up
+		var y_pos = 450 - (i * INITIAL_VERTICAL_SPACING)
 		spawn_platform_at_height(y_pos, 0)  # Height 0 = easy tier
 
 func _process(_delta):

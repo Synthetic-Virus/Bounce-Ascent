@@ -33,9 +33,9 @@ func _ready():
 
 	# Create UI container
 	var container = VBoxContainer.new()
-	container.position = Vector2(150, 100)
-	container.size = Vector2(500, 800)
-	container.add_theme_constant_override("separation", 20)
+	container.position = Vector2(100, 50)
+	container.size = Vector2(600, 900)
+	container.add_theme_constant_override("separation", 15)
 	add_child(container)
 
 	# Title

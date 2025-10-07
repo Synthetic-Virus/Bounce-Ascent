@@ -13,11 +13,12 @@ var countdown_active: bool = false
 var countdown_time: float = 3.0
 
 func _ready():
-	# Create background
+	# Create dynamic background that transitions from sky to space
 	var bg = ColorRect.new()
-	bg.color = Color(0.05, 0.05, 0.1)  # Dark blue-black
+	bg.color = Color(0.53, 0.81, 0.92)  # Sky blue
 	bg.size = Vector2(800, 1000)
 	bg.z_index = -100
+	bg.set_script(preload("res://scripts/DynamicBackground.gd"))
 	add_child(bg)
 
 	# Add CRT shader overlay (disabled for now - causes white screen)
@@ -64,6 +65,9 @@ func start_game():
 
 	# Initialize GameManager session
 	GameManager.start_game_session()
+
+	# Enable player physics now that game is starting
+	player.enable_physics()
 
 	# Start camera scrolling (platforms already spawned during countdown)
 	camera.start_scrolling()

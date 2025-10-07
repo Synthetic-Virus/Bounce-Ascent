@@ -12,6 +12,7 @@ var manual_jump_cooldown_timer: float = 0.0
 var is_grounded: bool = false
 var can_jump: bool = true
 var last_platform = null
+var physics_enabled: bool = false  # Don't move until countdown finishes
 
 # Screen boundaries
 var screen_width: int = 800
@@ -45,6 +46,11 @@ func _draw():
 	draw_arc(Vector2.ZERO, player_radius, 0, TAU, 32, ball_color.lightened(0.3), 2.0)
 
 func _physics_process(delta):
+	# Don't process physics until game starts
+	if not physics_enabled:
+		velocity = Vector2.ZERO
+		return
+
 	# Apply gravity
 	if not is_on_floor():
 		velocity.y += get_gravity().y * delta
@@ -122,6 +128,10 @@ func reset_position(spawn_position: Vector2):
 	manual_jump_cooldown_timer = 0.0
 	is_grounded = false
 	last_platform = null
+	physics_enabled = false
+
+func enable_physics():
+	physics_enabled = true
 
 func get_gravity() -> Vector2:
 	return Vector2(0, ProjectSettings.get_setting("physics/2d/default_gravity"))
