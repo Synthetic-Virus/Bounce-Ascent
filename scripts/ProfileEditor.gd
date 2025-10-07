@@ -19,9 +19,9 @@ var preset_colors: Array = [
 ]
 
 func _ready():
-	# Set background
+	# Set background - fully opaque to hide main menu
 	var bg = ColorRect.new()
-	bg.color = Color(0.05, 0.05, 0.1, 0.95)  # Semi-transparent
+	bg.color = Color(0.05, 0.05, 0.1, 1.0)  # Fully opaque
 	bg.size = Vector2(800, 1000)
 	bg.z_index = -1
 	add_child(bg)
@@ -171,7 +171,7 @@ func update_stats_display():
 	stats_text += "High Score: " + str(profile.high_score) + "\n"
 	stats_text += "Total Runs: " + str(profile.total_runs) + "\n"
 	stats_text += "Total Height: " + str(profile.total_height) + "\n"
-	stats_text += "Platforms Landed: " + str(profile.platforms_landed) + "\n"
+	stats_text += "Platforms Landed On: " + str(profile.platforms_landed) + "\n"
 	stats_text += "Platforms Broken: " + str(profile.platforms_broken) + "\n"
 	stats_text += "Total Time: " + str(snappedf(profile.total_time_survived, 0.1)) + "s\n"
 	stats_text += "Deaths: " + str(profile.fell_to_death_count) + "\n"
@@ -183,3 +183,9 @@ func update_stats_display():
 
 func _on_close_pressed():
 	queue_free()
+
+func _input(event):
+	# Allow ESC to close profile editor
+	if event.is_action_pressed("ui_cancel"):
+		queue_free()
+		get_viewport().set_input_as_handled()

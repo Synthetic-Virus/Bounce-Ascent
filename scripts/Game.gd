@@ -35,10 +35,10 @@ func _ready():
 	add_child(platform_spawner)
 	platform_spawner.set_camera(camera)
 
-	# Create player
+	# Create player (position closer to camera center for better start)
 	player = CharacterBody2D.new()
 	player.set_script(load("res://scripts/Player.gd"))
-	player.position = Vector2(400, 800)
+	player.position = Vector2(400, 400)  # Higher up, closer to camera
 	add_child(player)
 
 	# Create UI
@@ -65,10 +65,7 @@ func start_game():
 	# Initialize GameManager session
 	GameManager.start_game_session()
 
-	# Spawn initial platforms
-	platform_spawner.spawn_initial_platforms()
-
-	# Start camera scrolling
+	# Start camera scrolling (platforms already spawned during countdown)
 	camera.start_scrolling()
 
 func create_countdown_label():

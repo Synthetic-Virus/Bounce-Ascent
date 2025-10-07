@@ -69,7 +69,7 @@ func display_stats(container: VBoxContainer):
 	var stats_text = ""
 	stats_text += "Height Reached: " + str(stats.height) + "\n"
 	stats_text += "Time Survived: " + str(snappedf(stats.time_survived, 0.1)) + "s\n"
-	stats_text += "Platforms Landed: " + str(stats.platforms_landed) + "\n"
+	stats_text += "Platforms Landed On: " + str(stats.platforms_landed) + "\n"
 	stats_text += "Platforms Broken: " + str(stats.platforms_broken) + "\n"
 	stats_text += "Forced Jumps: " + str(stats.forced_jumps) + "\n"
 
