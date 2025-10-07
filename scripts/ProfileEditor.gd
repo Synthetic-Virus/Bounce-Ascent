@@ -19,10 +19,15 @@ var preset_colors: Array = [
 ]
 
 func _ready():
+	# Make this control fill the screen
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+
 	# Set background - fully opaque to hide main menu
 	var bg = ColorRect.new()
 	bg.color = Color(0.05, 0.05, 0.1, 1.0)  # Fully opaque
-	bg.size = Vector2(800, 1000)
+	bg.anchor_right = 1.0
+	bg.anchor_bottom = 1.0
 	bg.z_index = -1
 	add_child(bg)
 
@@ -130,10 +135,10 @@ func _ready():
 	spacer4.custom_minimum_size = Vector2(0, 20)
 	container.add_child(spacer4)
 
-	# Close button
+	# Back button
 	close_button = Button.new()
-	close_button.text = "CLOSE"
-	close_button.custom_minimum_size = Vector2(200, 50)
+	close_button.text = "BACK TO MENU"
+	close_button.custom_minimum_size = Vector2(300, 50)
 	close_button.add_theme_font_size_override("font_size", 24)
 	close_button.pressed.connect(_on_close_pressed)
 	container.add_child(close_button)

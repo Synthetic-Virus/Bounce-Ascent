@@ -20,8 +20,8 @@ func _ready():
 	bg.z_index = -100
 	add_child(bg)
 
-	# Add CRT shader overlay
-	add_crt_shader()
+	# Add CRT shader overlay (disabled for now - causes white screen)
+	# add_crt_shader()
 
 	# Create camera
 	camera = Camera2D.new()
@@ -151,7 +151,8 @@ func add_crt_shader():
 	# Create a ColorRect that covers the screen
 	var crt_rect = ColorRect.new()
 	crt_rect.size = Vector2(800, 1000)
-	crt_rect.color = Color.WHITE
+	crt_rect.color = Color(1.0, 1.0, 1.0, 0.0)  # Transparent white
+	crt_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block mouse
 
 	# Load and apply the CRT shader
 	var shader = load("res://resources/shaders/crt_shader.gdshader")
