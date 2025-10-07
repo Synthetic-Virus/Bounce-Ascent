@@ -19,17 +19,18 @@ var preset_colors: Array = [
 ]
 
 func _ready():
-	# Make this control fill the screen
-	anchor_right = 1.0
-	anchor_bottom = 1.0
+	# Make this control fill the entire viewport
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	size = get_viewport_rect().size
+	mouse_filter = Control.MOUSE_FILTER_STOP  # Block all clicks to menu below
 
 	# Set background - fully opaque to hide main menu
 	var bg = ColorRect.new()
-	bg.color = Color(0.05, 0.05, 0.1, 1.0)  # Fully opaque
-	bg.anchor_right = 1.0
-	bg.anchor_bottom = 1.0
-	bg.z_index = -1
+	bg.color = Color(0.05, 0.05, 0.1, 1.0)  # Fully opaque dark background
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks pass to buttons
 	add_child(bg)
+	move_child(bg, 0)  # Make sure it's first (behind everything else)
 
 	# Create UI container
 	var container = VBoxContainer.new()

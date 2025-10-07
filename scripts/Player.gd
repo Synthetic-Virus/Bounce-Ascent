@@ -60,8 +60,13 @@ func _physics_process(delta):
 			on_landed()
 		is_grounded = true
 
-	# Horizontal movement
-	var direction = Input.get_axis("ui_left", "ui_right")
+	# Horizontal movement (explicit key checks)
+	var direction = 0.0
+	if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
+		direction = -1.0
+	elif Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D):
+		direction = 1.0
+
 	if direction != 0:
 		velocity.x = direction * MOVE_SPEED
 	else:
@@ -87,8 +92,12 @@ func _physics_process(delta):
 	if manual_jump_cooldown_timer > 0:
 		manual_jump_cooldown_timer -= delta
 
-	# Manual jump input
-	if Input.is_action_just_pressed("ui_accept") or Input.is_action_just_pressed("ui_up"):
+	# Manual jump input (explicit key checks)
+	var jump_pressed = (Input.is_key_pressed(KEY_SPACE) or
+	                    Input.is_key_pressed(KEY_W) or
+	                    Input.is_key_pressed(KEY_UP))
+
+	if jump_pressed:
 		if is_grounded and manual_jump_cooldown_timer <= 0:
 			perform_jump(true)
 			manual_jump_cooldown_timer = MANUAL_JUMP_COOLDOWN
