@@ -7,6 +7,8 @@ var height_label: Label
 var timer_label: Label
 var rhythm_label: Label
 var player_ref: CharacterBody2D = null
+var last_jump_quality: String = ""
+var jump_feedback_timer: float = 0.0
 
 func _ready():
 	# Create UI elements
@@ -18,8 +20,15 @@ func _ready():
 
 func set_player_reference(player: CharacterBody2D):
 	player_ref = player
+	# Connect to player's jumped signal to get quality feedback
+	if player_ref and player_ref.has_signal("jumped"):
+		player_ref.jumped.connect(_on_player_jumped)
 
-func _process(_delta):
+func _process(delta):
+	# Decay jump feedback timer
+	if jump_feedback_timer > 0:
+		jump_feedback_timer -= delta
+
 	# Update rhythm indicator if we have player reference
 	if player_ref != null and is_instance_valid(player_ref):
 		if player_ref.is_grounded and player_ref.physics_enabled:
@@ -38,9 +47,60 @@ func _process(_delta):
 
 			rhythm_label.text = timing_text
 		else:
-			rhythm_label.text = "IN AIR"
+			# Show jump quality feedback while in air
+			if jump_feedback_timer > 0:
+				show_jump_feedback()
+			else:
+				rhythm_label.text = ""
 	else:
 		rhythm_label.text = ""
+
+func _on_player_jumped(quality: String):
+	"""Called when player jumps with quality: 'perfect', 'great', or other"""
+	last_jump_quality = quality
+	jump_feedback_timer = 1.0  # Show feedback for 1 second
+
+	# Trigger animation based on quality
+	if quality == "perfect":
+		animate_perfect_jump()
+	elif quality == "great":
+		animate_close_jump()
+
+func show_jump_feedback():
+	"""Display the jump quality text"""
+	if last_jump_quality == "perfect":
+		rhythm_label.add_theme_color_override("font_color", Color.YELLOW)
+		rhythm_label.text = "CLOSE!"
+	elif last_jump_quality == "great":
+		rhythm_label.add_theme_color_override("font_color", Color.GREEN)
+		rhythm_label.text = "PERFECT!"
+	else:
+		rhythm_label.text = ""
+
+func animate_close_jump():
+	"""Wiggle animation for close/great jumps"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	# Slightly larger font
+	tween.tween_property(rhythm_label, "scale", Vector2(1.2, 1.2), 0.1)
+	tween.tween_property(rhythm_label, "rotation", deg_to_rad(5), 0.05)
+	tween.chain().tween_property(rhythm_label, "rotation", deg_to_rad(-5), 0.05)
+	tween.chain().tween_property(rhythm_label, "rotation", deg_to_rad(0), 0.05)
+	tween.set_parallel(false)
+	tween.tween_property(rhythm_label, "scale", Vector2(1.0, 1.0), 0.2)
+
+func animate_perfect_jump():
+	"""Grow and wiggle animation for perfect jumps"""
+	var tween = create_tween()
+	tween.set_parallel(true)
+	# Much larger font
+	tween.tween_property(rhythm_label, "scale", Vector2(1.5, 1.5), 0.15)
+	tween.tween_property(rhythm_label, "rotation", deg_to_rad(10), 0.075)
+	tween.chain().tween_property(rhythm_label, "rotation", deg_to_rad(-10), 0.075)
+	tween.chain().tween_property(rhythm_label, "rotation", deg_to_rad(5), 0.075)
+	tween.chain().tween_property(rhythm_label, "rotation", deg_to_rad(0), 0.075)
+	tween.set_parallel(false)
+	tween.tween_property(rhythm_label, "scale", Vector2(1.0, 1.0), 0.3)
 
 func setup_ui():
 	# Top-left: Profile name and high score
@@ -51,11 +111,15 @@ func setup_ui():
 	profile_label = Label.new()
 	profile_label.add_theme_font_size_override("font_size", 14)
 	profile_label.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
+	profile_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	profile_label.add_theme_constant_override("outline_size", 4)
 	top_left_container.add_child(profile_label)
 
 	high_score_label = Label.new()
 	high_score_label.add_theme_font_size_override("font_size", 14)
 	high_score_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.5))
+	high_score_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	high_score_label.add_theme_constant_override("outline_size", 4)
 	top_left_container.add_child(high_score_label)
 
 	# Center-top: Large height display
@@ -63,6 +127,8 @@ func setup_ui():
 	height_label.position = Vector2(300, 30)
 	height_label.add_theme_font_size_override("font_size", 48)
 	height_label.add_theme_color_override("font_color", Color(0.3, 0.8, 1.0, 0.9))
+	height_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	height_label.add_theme_constant_override("outline_size", 8)
 	height_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	height_label.size = Vector2(200, 80)
 	add_child(height_label)
@@ -72,18 +138,22 @@ func setup_ui():
 	timer_label.position = Vector2(650, 10)
 	timer_label.add_theme_font_size_override("font_size", 24)
 	timer_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 0.9))
+	timer_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	timer_label.add_theme_constant_override("outline_size", 6)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	timer_label.size = Vector2(140, 50)
 	add_child(timer_label)
 
-	# Center-bottom: Rhythm timing indicator
+	# Center: Rhythm timing indicator (below height counter)
 	rhythm_label = Label.new()
-	rhythm_label.position = Vector2(250, 850)
-	rhythm_label.add_theme_font_size_override("font_size", 32)
+	rhythm_label.position = Vector2(200, 120)
+	rhythm_label.add_theme_font_size_override("font_size", 28)
 	rhythm_label.add_theme_color_override("font_color", Color.WHITE)
+	rhythm_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	rhythm_label.add_theme_constant_override("outline_size", 8)
 	rhythm_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rhythm_label.size = Vector2(300, 100)
-	rhythm_label.text = "JUMP RHYTHM: --"
+	rhythm_label.size = Vector2(400, 60)
+	rhythm_label.text = ""
 	add_child(rhythm_label)
 
 	# Update initial values

@@ -37,7 +37,7 @@ var ball_color: Color = Color(0.29, 0.62, 1.0)
 # Signals
 signal landed_on_platform(platform)
 signal attempted_edge_escape()
-signal jumped(is_manual: bool)
+signal jumped(quality: String)
 
 func _ready():
 	# Get ball color from GameManager
@@ -128,10 +128,10 @@ func _draw():
 			var yellow_start_angle = -PI/2 + ((current_bounce_interval - TIMING_WINDOW_GREAT) / current_bounce_interval) * TAU
 			draw_arc(Vector2.ZERO, ring_radius + 3, yellow_start_angle, yellow_start_angle + 0.1, 8, Color.YELLOW, 2.0)
 
-	# Draw combo indicator
+	# Draw combo counter inside the ball
 	if combo_level > 0:
-		var combo_text_pos = Vector2(-15, 35)
-		draw_string(ThemeDB.fallback_font, combo_text_pos, "x" + str(combo_level), HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Color.YELLOW)
+		var combo_text = str(combo_level)
+		draw_string(ThemeDB.fallback_font, Vector2(-8, 8), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
 
 func _physics_process(delta):
 	# Don't process physics until game starts
@@ -249,8 +249,8 @@ func execute_bounce(bounce_velocity: float, quality: String):
 		bounce_timer = 0.0
 		last_bounce_quality = quality
 
-		# Emit jump signal
-		jumped.emit(quality != "base" and quality != "early")
+		# Emit jump signal with quality
+		jumped.emit(quality)
 
 		# Visual feedback based on quality (stronger with combo)
 		if quality == "great":

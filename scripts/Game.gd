@@ -82,12 +82,14 @@ func start_game():
 
 func create_countdown_label():
 	countdown_label = Label.new()
-	countdown_label.add_theme_font_size_override("font_size", 120)
+	countdown_label.add_theme_font_size_override("font_size", 180)
 	countdown_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	countdown_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	countdown_label.add_theme_constant_override("outline_size", 12)
 	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	countdown_label.position = Vector2(300, 400)
-	countdown_label.size = Vector2(200, 200)
+	countdown_label.position = Vector2(250, 350)
+	countdown_label.size = Vector2(300, 300)
 	countdown_label.z_index = 200
 	countdown_label.visible = false
 	add_child(countdown_label)
@@ -107,11 +109,9 @@ func _process(delta):
 		if countdown_time > 0:
 			countdown_label.text = str(int(ceil(countdown_time)))
 		else:
-			countdown_label.text = "GO!"
-			if countdown_time < -0.5:  # Show GO! for 0.5 seconds
-				countdown_label.visible = false
-				countdown_active = false
-				start_game()
+			countdown_label.visible = false
+			countdown_active = false
+			start_game()
 		return
 
 	if not game_active:
@@ -140,6 +140,8 @@ func _on_player_landed(platform):
 
 func end_game(death_type: String):
 	game_active = false
+	countdown_active = false  # Stop countdown if still active
+	countdown_label.visible = false  # Hide countdown immediately
 	camera.stop_scrolling()
 
 	# End session and save

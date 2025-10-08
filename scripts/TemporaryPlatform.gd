@@ -1,7 +1,8 @@
 extends Platform
 
-@export var disappear_time: float = 1.5  # Time before disappearing after landing
+@export var disappear_time: float = 2.0  # Time before falling after landing
 @export var warning_time: float = 0.5   # Flash warning time
+@export var fall_speed: float = 200.0   # How fast platform falls
 
 var timer: float = 0.0
 var player_has_landed: bool = false
@@ -43,7 +44,9 @@ func disappear():
 		if child is CollisionShape2D:
 			child.set_deferred("disabled", true)
 
-	# Fade out
+	# Start falling animation
 	var tween = create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, 0.2)
-	tween.tween_callback(deactivate)
+	tween.set_parallel(true)
+	tween.tween_property(self, "position:y", position.y + 1000, 2.0)  # Fall down
+	tween.tween_property(self, "modulate:a", 0.0, 1.0)  # Fade while falling
+	tween.chain().tween_callback(deactivate)

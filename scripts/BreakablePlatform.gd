@@ -1,30 +1,49 @@
 extends Platform
 
 var is_broken: bool = false
+var break_progress: float = 0.0
+const BREAK_TIME: float = 0.5  # Time to fully dissolve
 
 func _ready():
 	super._ready()
 	platform_type = PlatformType.BREAKABLE
 
+func _process(delta):
+	if is_broken and break_progress < 1.0:
+		break_progress += delta / BREAK_TIME
+		queue_redraw()  # Redraw to show dissolve effect
+
+		# Disable collision when 80% dissolved
+		if break_progress >= 0.8:
+			for child in get_children():
+				if child is CollisionShape2D:
+					child.set_deferred("disabled", true)
+
+		# Fully gone
+		if break_progress >= 1.0:
+			deactivate()
+
 func on_player_land():
 	if not is_broken:
 		is_broken = true
 		GameManager.increment_platform_broken()
-		break_platform()
+		create_break_particles()
 
-func break_platform():
-	# Create particle effect
-	create_break_particles()
+func _draw():
+	# Call parent draw first
+	super._draw()
 
-	# Disable collision
-	for child in get_children():
-		if child is CollisionShape2D:
-			child.set_deferred("disabled", true)
+	# Draw dissolve effect on top
+	if is_broken and break_progress > 0.0:
+		# Create crack/dissolve pattern
+		var rect = Rect2(-platform_width / 2, -platform_height / 2, platform_width, platform_height)
+		var num_cracks = int(break_progress * 20)
 
-	# Visual feedback - fade out
-	var tween = create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, 0.3)
-	tween.tween_callback(deactivate)
+		for i in range(num_cracks):
+			var x = rect.position.x + randf() * rect.size.x
+			var y = rect.position.y + randf() * rect.size.y
+			var crack_size = randf_range(3, 8) * break_progress
+			draw_circle(Vector2(x, y), crack_size, Color(0, 0, 0, 0.6))
 
 func create_break_particles():
 	# Simple particle effect using multiple small squares

@@ -12,26 +12,44 @@ A challenging 2D endless platformer where you control a bouncing ball that must 
 ## Game Features
 
 ### Core Gameplay
-- **Auto-Jump Mechanic**: Ball automatically jumps every 2.5 seconds
-- **Manual Jump**: Force a jump anytime with spacebar/up arrow (with cooldown)
-- **Horizontal Movement**: Control left/right movement with arrow keys or WASD
-- **Scrolling Camera**: Screen scrolls downward - don't fall behind!
-- **Progressive Difficulty**: Game gets harder as you climb higher
+- **Rhythm-Based Bouncing**: Ball automatically bounces every 1.5 seconds
+- **Timing System**: Press spacebar during timing windows for bonus height:
+  - **PERFECT!** (Green/0.1s window): Maximum height boost
+  - **CLOSE!** (Yellow/0.2s window): Good height boost
+- **Combo System**: Successive successful timings increase:
+  - Bounce speed (faster rhythm, down to 0.5s minimum)
+  - Jump height (-50 velocity per combo level)
+  - Visual feedback (combo counter in ball center)
+- **Horizontal Movement**: Control left/right with arrow keys or WASD
+- **Scrolling Camera**: Screen scrolls upward - don't fall behind!
+- **Progressive Difficulty**: Game speeds up dramatically in space zone (600+ height)
 
 ### Platform Types
 
 1. **Static Platforms** (Green) - Basic solid platforms
 2. **Moving Platforms** (Yellow) - Oscillate horizontally
-3. **Breakable Platforms** (Red) - Shatter after landing once
-4. **Temporary Platforms** (Purple) - Disappear after a short time
+3. **Breakable Platforms** (Red) - Dissolve over 0.5s, player falls through at 80% dissolved
+4. **Temporary Platforms** (Purple) - Flash warning then fall after 2 seconds
 
-### Difficulty Tiers
+### Difficulty Progression
 
+**Platform Tiers:**
 - **Tier 1 (0-50 height)**: Static platforms only
-- **Tier 2 (50-100)**: Moving platforms introduced
-- **Tier 3 (100-150)**: Breakable platforms added
-- **Tier 4 (150-200)**: Temporary platforms appear
-- **Tier 5 (200+)**: Smaller platforms, larger gaps, faster scroll speed
+- **Tier 2 (50-100)**: Moving platforms introduced (30% chance)
+- **Tier 3 (100-150)**: Breakable platforms added (20% chance)
+- **Tier 4 (150-200)**: Temporary platforms appear (15% chance)
+- **Tier 5 (200+)**: Smaller platforms, larger gaps
+
+**Visual Transitions:**
+- **Sky (0-200)**: Light blue starting zone
+- **Sunset (200-400)**: Orange/pink transition
+- **Dusk (400-600)**: Purple twilight with emerging stars
+- **Space (600+)**: Deep space with stars, 2x speed multiplier kicks in
+
+**Speed Scaling:**
+- Base scroll speed: 30 px/s
+- Max scroll speed: 300 px/s (was 120)
+- Space zone (600-1000 height): Progressive speed multiplier up to 2x
 
 ### Scoring System
 
@@ -55,19 +73,30 @@ Your score is calculated from:
 ## Controls
 
 - **Left/Right Arrow** or **A/D**: Move horizontally
-- **Spacebar** or **Up Arrow** or **W**: Force a jump
-- **ESC**: Quit game
+- **Spacebar** or **Up Arrow** or **W**: Time your bounce (press during green/yellow timing windows)
+- **ESC**: Return to menu / Quit game
+
+### Timing Guide
+- **Visual Ring**: White ring fills around ball showing bounce timer
+- **Green Marker**: PERFECT timing window (0.2s before auto-bounce)
+- **Yellow Marker**: CLOSE timing window (0.1s before auto-bounce)
+- **Combo Counter**: Number inside ball shows current combo streak
+- **Feedback Text**: "PERFECT!" or "CLOSE!" displays after successful timing
 
 ## Technical Features
 
 ### Visual Style
-- Simple geometric shapes (circles and rectangles)
-- Neon color palette
-- CRT monitor effect with:
-  - Scanlines
-  - Chromatic aberration
-  - Vignette
-  - Screen noise
+- **Geometric Shapes**: Circles (ball) and rounded rectangles (platforms)
+- **Black Outlines**: 3px outlines on all game elements for visibility
+- **Text Outlines**: All UI text has black outlines for readability on any background
+- **Neon Color Palette**: Bright colors with customizable ball colors
+- **Dynamic Background**: Smooth color transitions from sky → sunset → dusk → space
+- **Particle Effects**: Break particles when platforms shatter
+- **Animated Feedback**:
+  - CLOSE jumps: 1.2x scale + wiggle animation
+  - PERFECT jumps: 1.5x scale + dramatic wiggle animation
+  - Timing ring with color-coded windows
+  - Combo burst effects
 
 ### Anti-Cheat Security
 
@@ -84,9 +113,11 @@ Save files cannot be easily edited to cheat high scores!
 ### Profile System
 
 All player data is stored in an encrypted profile file including:
-- Username and high score
-- Cumulative statistics across all runs
-- Session history
+- **Customization**: Username and ball color (8 preset colors)
+- **High Score**: Best score achieved across all runs
+- **Cumulative Statistics**: Total runs, height, platforms, time survived
+- **Session History**: Detailed per-run statistics
+- **Profile Editor**: In-game UI for customization and viewing stats
 
 ## Development
 
