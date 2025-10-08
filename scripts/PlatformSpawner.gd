@@ -33,13 +33,33 @@ func set_camera(camera: Camera2D):
 	camera_ref = camera
 
 func spawn_initial_platforms():
-	# Spawn a starting platform right below player
-	spawn_platform_at_height(450, 0)  # Just below player at y=400
+	# Fill entire screen with platforms from bottom (y=1000) to top (y=0)
+	# Player starts at y=400
+	var player_y = 400
+	var screen_bottom = 1000
+	var screen_top = 0
 
-	# Spawn platforms from bottom to top
-	for i in range(1, 13):  # Spawn ~12 more platforms going up
-		var y_pos = 450 - (i * INITIAL_VERTICAL_SPACING)
-		spawn_platform_at_height(y_pos, 0)  # Height 0 = easy tier
+	# First platform ALWAYS spawns directly under player (x=400, y=480)
+	var first_platform = create_platform_for_difficulty(0)
+	first_platform.position = Vector2(400, player_y + 80)  # Centered under player
+	first_platform.platform_width = 140  # Wider for safety
+	add_child(first_platform)
+	platforms.append(first_platform)
+
+	# Spawn platforms downward from first platform to screen bottom
+	var y_pos = player_y + 80 + INITIAL_VERTICAL_SPACING
+	while y_pos < screen_bottom:
+		spawn_platform_at_height(y_pos, 0)
+		y_pos += INITIAL_VERTICAL_SPACING
+
+	# Spawn platforms upward from first platform to screen top
+	y_pos = player_y + 80 - INITIAL_VERTICAL_SPACING
+	while y_pos > screen_top:
+		spawn_platform_at_height(y_pos, 0)
+		y_pos -= INITIAL_VERTICAL_SPACING
+
+	# Update last_spawn_y to continue from the highest platform
+	last_spawn_y = screen_top - INITIAL_VERTICAL_SPACING
 
 func _process(_delta):
 	if camera_ref == null:

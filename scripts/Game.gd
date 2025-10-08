@@ -12,14 +12,16 @@ var game_active: bool = false
 var countdown_active: bool = false
 var countdown_time: float = 3.0
 
+var background: ColorRect
+
 func _ready():
 	# Create dynamic background that transitions from sky to space
-	var bg = ColorRect.new()
-	bg.color = Color(0.53, 0.81, 0.92)  # Sky blue
-	bg.size = Vector2(800, 1000)
-	bg.z_index = -100
-	bg.set_script(preload("res://scripts/DynamicBackground.gd"))
-	add_child(bg)
+	background = ColorRect.new()
+	background.color = Color(0.53, 0.81, 0.92)  # Sky blue
+	background.size = Vector2(800, 1000)
+	background.z_index = -100
+	background.set_script(preload("res://scripts/DynamicBackground.gd"))
+	add_child(background)
 
 	# Add CRT shader overlay (disabled for now - causes white screen)
 	# add_crt_shader()
@@ -47,12 +49,18 @@ func _ready():
 	ui.set_script(load("res://scripts/GameUI.gd"))
 	add_child(ui)
 
+	# Set player reference for rhythm indicator (AFTER add_child so _ready has run)
+	ui.set_player_reference(player)
+
 	# Connect signals
 	camera.player_fell_behind.connect(_on_player_fell_behind)
 	player.landed_on_platform.connect(_on_player_landed)
 
 	# Set player camera reference
 	camera.set_player(player)
+
+	# Setup background with camera reference
+	background.setup_background(camera)
 
 	# Create countdown label
 	create_countdown_label()
@@ -112,10 +120,13 @@ func _process(delta):
 	# Update time survived
 	GameManager.update_time_survived(delta)
 
-	# Update height based on camera position
-	var current_height = camera.get_current_height()
-	if current_height > GameManager.session_stats.height:
-		var height_diff = current_height - GameManager.session_stats.height
+	# Update height based on player's actual position (how high they've climbed)
+	# Player starts at y=400, moving upward (negative Y) increases height
+	var player_height = max(0, int((400.0 - player.position.y) / 10.0))
+
+	# Update GameManager if player reached new height
+	if player_height > GameManager.session_stats.height:
+		var height_diff = player_height - GameManager.session_stats.height
 		for i in range(height_diff):
 			GameManager.increment_height()
 

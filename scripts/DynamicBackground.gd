@@ -6,16 +6,22 @@ const SUNSET_COLOR = Color(0.98, 0.55, 0.38)   # Orange/pink sunset
 const DUSK_COLOR = Color(0.25, 0.15, 0.35)     # Purple dusk
 const SPACE_COLOR = Color(0.02, 0.02, 0.08)    # Dark space
 
-# Height thresholds for color transitions
-const SUNSET_HEIGHT = 50
-const DUSK_HEIGHT = 100
-const SPACE_HEIGHT = 150
+# Height thresholds for color transitions (much higher for combo system)
+const SUNSET_HEIGHT = 200
+const DUSK_HEIGHT = 400
+const SPACE_HEIGHT = 600
 
 # Stars for space background
 var stars: Array = []
 const MAX_STARS = 100
+var camera_ref: Camera2D = null
 
 func _ready():
+	# This will be set from Game.gd
+	pass
+
+func setup_background(camera: Camera2D):
+	camera_ref = camera
 	# Generate random stars
 	for i in range(MAX_STARS):
 		stars.append({
@@ -25,6 +31,10 @@ func _ready():
 		})
 
 func _process(_delta):
+	# Follow the camera
+	if camera_ref:
+		global_position = camera_ref.global_position - Vector2(400, 500)
+
 	# Get current height from GameManager
 	var height = GameManager.session_stats.height if GameManager.session_stats.has("height") else 0
 

@@ -6,6 +6,25 @@ var profile_button: Button
 var quit_button: Button
 var profile_info: Label
 
+func create_rounded_button_style() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.3)
+	style.border_color = Color(0.4, 0.4, 0.5)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	return style
+
+func apply_rounded_style(button: Button):
+	var normal = create_rounded_button_style()
+	var hover = create_rounded_button_style()
+	hover.bg_color = Color(0.3, 0.3, 0.4)
+	var pressed = create_rounded_button_style()
+	pressed.bg_color = Color(0.15, 0.15, 0.25)
+
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+
 func _ready():
 	# Set background
 	var bg = ColorRect.new()
@@ -47,6 +66,7 @@ func _ready():
 	play_button.custom_minimum_size = Vector2(200, 50)
 	play_button.add_theme_font_size_override("font_size", 24)
 	play_button.pressed.connect(_on_play_pressed)
+	apply_rounded_style(play_button)
 	container.add_child(play_button)
 
 	# Profile button
@@ -55,6 +75,7 @@ func _ready():
 	profile_button.custom_minimum_size = Vector2(200, 50)
 	profile_button.add_theme_font_size_override("font_size", 24)
 	profile_button.pressed.connect(_on_profile_pressed)
+	apply_rounded_style(profile_button)
 	container.add_child(profile_button)
 
 	# Quit button
@@ -63,6 +84,7 @@ func _ready():
 	quit_button.custom_minimum_size = Vector2(200, 50)
 	quit_button.add_theme_font_size_override("font_size", 24)
 	quit_button.pressed.connect(_on_quit_pressed)
+	apply_rounded_style(quit_button)
 	container.add_child(quit_button)
 
 	# Update profile display

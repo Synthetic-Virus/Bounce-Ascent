@@ -24,9 +24,11 @@ GameManager="*res://scripts/GameManager.gd"
 
 window/size/viewport_width=800
 window/size/viewport_height=1000
-window/size/resizable=true
+window/size/resizable=false
+window/size/window_width_override=800
+window/size/window_height_override=1000
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep_height"
+window/stretch/aspect="keep"
 
 [rendering]
 

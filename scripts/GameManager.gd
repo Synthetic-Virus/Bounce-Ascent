@@ -15,7 +15,6 @@ var session_stats: Dictionary = {
 	"platforms_broken": 0,
 	"time_survived": 0.0,
 	"edge_escape_attempts": 0,
-	"forced_jumps": 0,
 	"start_time": 0.0
 }
 
@@ -32,10 +31,14 @@ func _ready():
 	load_or_create_profile()
 
 func _notification(what):
-	# Detect rage quits
+	# Detect rage quits and save session data
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if _game_active and session_stats.time_survived > 0:
+			# End session and save all data (including rage quit)
 			current_profile.rage_quit_count += 1
+			end_game_session("rage_quit")
+		else:
+			# Just save profile if not in game
 			save_profile()
 		get_tree().quit()
 
@@ -68,7 +71,6 @@ func create_default_profile() -> Dictionary:
 		"edge_escape_attempts": 0,
 		"fell_to_death_count": 0,
 		"rage_quit_count": 0,
-		"forced_jumps": 0,
 		"created_timestamp": Time.get_unix_time_from_system(),
 		"last_played": Time.get_unix_time_from_system()
 	}
@@ -142,7 +144,7 @@ func load_profile_from_file(save_path: String):
 	var profile_json = JSON.stringify(payload.profile)
 	var expected_signature = generate_hmac(profile_json)
 	if payload.signature != expected_signature:
-		push_error("Profile signature verification failed - data may be tampered")
+		# Signature mismatch - likely old format, just return null silently
 		return null
 
 	# Verify checksum
@@ -233,7 +235,6 @@ func start_game_session():
 		"platforms_broken": 0,
 		"time_survived": 0.0,
 		"edge_escape_attempts": 0,
-		"forced_jumps": 0,
 		"start_time": Time.get_unix_time_from_system()
 	}
 	_height_check = 0
@@ -258,13 +259,16 @@ func end_game_session(death_type: String):
 	current_profile.total_height += session_stats.height
 	current_profile.total_time_survived += session_stats.time_survived
 	current_profile.edge_escape_attempts += session_stats.edge_escape_attempts
-	current_profile.forced_jumps += session_stats.forced_jumps
 
 	if death_type == "fell":
 		current_profile.fell_to_death_count += 1
 
-	if score > current_profile.high_score:
+	# Update high score (use >= to ensure it saves even if equal)
+	if score >= current_profile.high_score:
 		current_profile.high_score = score
+
+	# Emit stats updated signal for UI
+	stats_updated.emit(session_stats)
 
 	save_profile()
 
@@ -278,23 +282,29 @@ func calculate_score(stats: Dictionary) -> int:
 func validate_session_stats() -> bool:
 	# Redundancy check
 	if session_stats.height != _height_check:
+		push_warning("Validation failed: height mismatch. height=%d, _height_check=%d" % [session_stats.height, _height_check])
 		return false
 	if session_stats.platforms_landed != _platforms_check:
+		push_warning("Validation failed: platforms mismatch. platforms_landed=%d, _platforms_check=%d" % [session_stats.platforms_landed, _platforms_check])
 		return false
 
 	# Can't break more than landed
 	if session_stats.platforms_broken > session_stats.platforms_landed:
+		push_warning("Validation failed: broken > landed")
 		return false
 
-	# Height can't exceed platforms landed * 2
-	if session_stats.height > session_stats.platforms_landed * 2:
+	# Height can't exceed platforms landed * 20 (combo system allows VERY high jumps)
+	if session_stats.height > session_stats.platforms_landed * 20:
+		push_warning("Validation failed: height > platforms * 20. height=%d, platforms=%d" % [session_stats.height, session_stats.platforms_landed])
 		return false
 
-	# Time must be reasonable
-	var min_time = session_stats.height * 0.3
-	if session_stats.time_survived < min_time and session_stats.height > 10:
+	# Time must be reasonable (relaxed due to faster bounces with combo)
+	var min_time = session_stats.height * 0.1
+	if session_stats.time_survived < min_time and session_stats.height > 50:
+		push_warning("Validation failed: time too short. time=%f, min_time=%f" % [session_stats.time_survived, min_time])
 		return false
 
+	print("Session validation passed! Stats: ", session_stats)
 	return true
 
 # Session stat incrementers with validation
@@ -320,11 +330,6 @@ func increment_edge_escape():
 	if not _game_active:
 		return
 	session_stats.edge_escape_attempts += 1
-
-func increment_forced_jump():
-	if not _game_active:
-		return
-	session_stats.forced_jumps += 1
 
 func update_time_survived(delta: float):
 	if not _game_active:

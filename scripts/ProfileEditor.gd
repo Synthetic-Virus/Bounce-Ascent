@@ -18,6 +18,25 @@ var preset_colors: Array = [
 	Color(1.0, 0.3, 0.7),    # Pink
 ]
 
+func create_rounded_button_style() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.3)
+	style.border_color = Color(0.4, 0.4, 0.5)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	return style
+
+func apply_rounded_style(button: Button):
+	var normal = create_rounded_button_style()
+	var hover = create_rounded_button_style()
+	hover.bg_color = Color(0.3, 0.3, 0.4)
+	var pressed = create_rounded_button_style()
+	pressed.bg_color = Color(0.15, 0.15, 0.25)
+
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+
 func _ready():
 	# Make this control fill the entire viewport
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -91,16 +110,30 @@ func _ready():
 		var color_btn = Button.new()
 		color_btn.custom_minimum_size = Vector2(80, 80)
 
-		# Create a colored panel style
+		# Create a colored panel style with rounded corners
 		var style_normal = StyleBoxFlat.new()
 		style_normal.bg_color = preset_colors[i]
-		style_normal.border_width_all = 2
+		style_normal.border_width_left = 2
+		style_normal.border_width_right = 2
+		style_normal.border_width_top = 2
+		style_normal.border_width_bottom = 2
 		style_normal.border_color = Color.WHITE
+		style_normal.corner_radius_top_left = 12
+		style_normal.corner_radius_top_right = 12
+		style_normal.corner_radius_bottom_left = 12
+		style_normal.corner_radius_bottom_right = 12
 
 		var style_hover = StyleBoxFlat.new()
 		style_hover.bg_color = preset_colors[i].lightened(0.2)
-		style_hover.border_width_all = 4
+		style_hover.border_width_left = 4
+		style_hover.border_width_right = 4
+		style_hover.border_width_top = 4
+		style_hover.border_width_bottom = 4
 		style_hover.border_color = Color.WHITE
+		style_hover.corner_radius_top_left = 12
+		style_hover.corner_radius_top_right = 12
+		style_hover.corner_radius_bottom_left = 12
+		style_hover.corner_radius_bottom_right = 12
 
 		color_btn.add_theme_stylebox_override("normal", style_normal)
 		color_btn.add_theme_stylebox_override("hover", style_hover)
@@ -142,6 +175,7 @@ func _ready():
 	close_button.custom_minimum_size = Vector2(300, 50)
 	close_button.add_theme_font_size_override("font_size", 24)
 	close_button.pressed.connect(_on_close_pressed)
+	apply_rounded_style(close_button)
 	container.add_child(close_button)
 
 	# Highlight current color
@@ -165,10 +199,16 @@ func highlight_current_color():
 		var style = btn.get_theme_stylebox("normal")
 		if style is StyleBoxFlat:
 			if preset_colors[i].is_equal_approx(current_color):
-				style.border_width_all = 5
+				style.border_width_left = 5
+				style.border_width_right = 5
+				style.border_width_top = 5
+				style.border_width_bottom = 5
 				style.border_color = Color.YELLOW
 			else:
-				style.border_width_all = 2
+				style.border_width_left = 2
+				style.border_width_right = 2
+				style.border_width_top = 2
+				style.border_width_bottom = 2
 				style.border_color = Color.WHITE
 
 func update_stats_display():

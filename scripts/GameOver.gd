@@ -2,6 +2,25 @@ extends Control
 
 var stats: Dictionary = {}
 
+func create_rounded_button_style() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.3)
+	style.border_color = Color(0.4, 0.4, 0.5)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	return style
+
+func apply_rounded_style(button: Button):
+	var normal = create_rounded_button_style()
+	var hover = create_rounded_button_style()
+	hover.bg_color = Color(0.3, 0.3, 0.4)
+	var pressed = create_rounded_button_style()
+	pressed.bg_color = Color(0.15, 0.15, 0.25)
+
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+
 func _ready():
 	# Set background
 	var bg = ColorRect.new()
@@ -45,6 +64,7 @@ func _ready():
 	retry_button.custom_minimum_size = Vector2(200, 50)
 	retry_button.add_theme_font_size_override("font_size", 24)
 	retry_button.pressed.connect(_on_retry_pressed)
+	apply_rounded_style(retry_button)
 	container.add_child(retry_button)
 
 	var menu_button = Button.new()
@@ -52,6 +72,7 @@ func _ready():
 	menu_button.custom_minimum_size = Vector2(200, 50)
 	menu_button.add_theme_font_size_override("font_size", 24)
 	menu_button.pressed.connect(_on_menu_pressed)
+	apply_rounded_style(menu_button)
 	container.add_child(menu_button)
 
 func display_stats(container: VBoxContainer):
@@ -71,7 +92,6 @@ func display_stats(container: VBoxContainer):
 	stats_text += "Time Survived: " + str(snappedf(stats.time_survived, 0.1)) + "s\n"
 	stats_text += "Platforms Landed On: " + str(stats.platforms_landed) + "\n"
 	stats_text += "Platforms Broken: " + str(stats.platforms_broken) + "\n"
-	stats_text += "Forced Jumps: " + str(stats.forced_jumps) + "\n"
 
 	if stats.edge_escape_attempts > 0:
 		stats_text += "\nEdge Escape Attempts: " + str(stats.edge_escape_attempts)
