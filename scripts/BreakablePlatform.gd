@@ -30,20 +30,9 @@ func on_player_land():
 		create_break_particles()
 
 func _draw():
-	# Call parent draw first
-	super._draw()
-
-	# Draw dissolve effect on top
-	if is_broken and break_progress > 0.0:
-		# Create crack/dissolve pattern
-		var rect = Rect2(-platform_width / 2, -platform_height / 2, platform_width, platform_height)
-		var num_cracks = int(break_progress * 20)
-
-		for i in range(num_cracks):
-			var x = rect.position.x + randf() * rect.size.x
-			var y = rect.position.y + randf() * rect.size.y
-			var crack_size = randf_range(3, 8) * break_progress
-			draw_circle(Vector2(x, y), crack_size, Color(0, 0, 0, 0.6))
+	# Draw dissolve effect - modify sprite transparency instead of drawing cracks
+	if is_broken and break_progress > 0.0 and sprite:
+		sprite.modulate.a = 1.0 - break_progress
 
 func create_break_particles():
 	# Simple particle effect using multiple small squares
