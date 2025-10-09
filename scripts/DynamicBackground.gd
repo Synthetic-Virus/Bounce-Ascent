@@ -42,20 +42,32 @@ func _process(_delta):
 	var bg_color = get_color_for_height(height)
 	color = bg_color
 
-	# Draw stars when in space
-	if height >= DUSK_HEIGHT:
-		queue_redraw()
+	# Update star visibility based on height (without redrawing)
+	update_star_visibility(height)
 
-func _draw():
-	var height = GameManager.session_stats.height if GameManager.session_stats.has("height") else 0
+var star_sprites: Array = []
 
-	# Draw stars when transitioning to space
-	if height >= DUSK_HEIGHT:
+func update_star_visibility(height: int):
+	# Only create star sprites once when entering space
+	if height >= DUSK_HEIGHT and star_sprites.is_empty():
+		create_star_sprites()
+
+	# Update opacity
+	if not star_sprites.is_empty():
 		var star_opacity = clamp((height - DUSK_HEIGHT) / float(SPACE_HEIGHT - DUSK_HEIGHT), 0.0, 1.0)
+		for sprite in star_sprites:
+			sprite.modulate.a = star_opacity
 
-		for star in stars:
-			var star_color = Color(1.0, 1.0, 1.0, star["brightness"] * star_opacity)
-			draw_circle(star["pos"], star["size"], star_color)
+func create_star_sprites():
+	# Create actual sprite nodes instead of drawing (better performance)
+	for star_data in stars:
+		var star_sprite = ColorRect.new()
+		star_sprite.size = Vector2(star_data["size"], star_data["size"])
+		star_sprite.position = star_data["pos"]
+		star_sprite.color = Color(1.0, 1.0, 1.0, star_data["brightness"])
+		star_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(star_sprite)
+		star_sprites.append(star_sprite)
 
 func get_color_for_height(height: int) -> Color:
 	if height < SUNSET_HEIGHT:

@@ -57,78 +57,21 @@ func _ready():
 	queue_redraw()
 
 func _draw():
-	# Ensure feedback_scale is valid
-	if feedback_scale <= 0 or is_nan(feedback_scale):
-		feedback_scale = 1.0
+	# Simple optimized ball sprite - just draw a circle with outline
+	# Remove complex procedural rendering for better performance
+	var draw_radius = player_radius
 
-	# Apply scale effect for feedback
-	var draw_radius = player_radius * feedback_scale
-
-	# Draw black outline/shadow first
-	var outline_width = 3.0
-	draw_circle(Vector2.ZERO, draw_radius + outline_width, Color.BLACK)
+	# Draw black outline
+	draw_circle(Vector2.ZERO, draw_radius + 3, Color.BLACK)
 
 	# Draw ball with custom color
 	draw_circle(Vector2.ZERO, draw_radius, ball_color)
 
-	# Add rubber texture - simple geometric lines
-	var darker = ball_color.darkened(0.2)
+	# Simple highlight for 3D effect
 	var lighter = ball_color.lightened(0.3)
+	draw_circle(Vector2(-4, -4), draw_radius * 0.25, Color(lighter, 0.6))
 
-	# Draw curved lines for rubber pattern
-	for i in range(3):
-		var angle = (i * TAU / 3.0)
-		var start = Vector2(cos(angle), sin(angle)) * (draw_radius * 0.7)
-		var end = Vector2(cos(angle + PI), sin(angle + PI)) * (draw_radius * 0.7)
-		draw_line(start, end, darker, 2.0)
-
-	# Highlight circle for shine
-	draw_circle(Vector2(-4, -4), draw_radius * 0.3, Color(lighter, 0.4))
-
-	# Outer rim
-	draw_arc(Vector2.ZERO, draw_radius, 0, TAU, 32, lighter, 2.0)
-
-	# Draw quality feedback burst
-	if feedback_timer > 0 and (last_bounce_quality == "great" or last_bounce_quality == "perfect"):
-		var text_color = Color.YELLOW if last_bounce_quality == "great" else Color.GREEN
-		var burst_radius = draw_radius + 10 + (feedback_timer * 30)
-		draw_arc(Vector2.ZERO, burst_radius, 0, TAU, 32, text_color, 3.0)
-
-	# RHYTHM TIMING INDICATOR - Draw timer ring around ball
-	if is_grounded and physics_enabled:
-		var time_until_bounce = current_bounce_interval - bounce_timer
-		var progress = bounce_timer / current_bounce_interval
-
-		# Determine ring color based on timing window
-		var ring_color = Color.WHITE
-		var ring_width = 3.0
-
-		if time_until_bounce <= TIMING_WINDOW_GREAT:
-			# GREAT window (yellow)
-			ring_color = Color.YELLOW
-			ring_width = 5.0
-		elif time_until_bounce <= TIMING_WINDOW_PERFECT:
-			# PERFECT window (green)
-			ring_color = Color.GREEN
-			ring_width = 4.0
-
-		# Draw progress ring
-		var ring_radius = player_radius + 8.0
-		var arc_angle = progress * TAU
-		draw_arc(Vector2.ZERO, ring_radius, -PI/2, -PI/2 + arc_angle, 32, ring_color, ring_width)
-
-		# Draw timing window indicators
-		if time_until_bounce > TIMING_WINDOW_PERFECT:
-			# Draw green window marker
-			var green_start_angle = -PI/2 + ((current_bounce_interval - TIMING_WINDOW_PERFECT) / current_bounce_interval) * TAU
-			draw_arc(Vector2.ZERO, ring_radius + 3, green_start_angle, green_start_angle + 0.1, 8, Color.GREEN, 2.0)
-
-		if time_until_bounce > TIMING_WINDOW_GREAT:
-			# Draw yellow window marker
-			var yellow_start_angle = -PI/2 + ((current_bounce_interval - TIMING_WINDOW_GREAT) / current_bounce_interval) * TAU
-			draw_arc(Vector2.ZERO, ring_radius + 3, yellow_start_angle, yellow_start_angle + 0.1, 8, Color.YELLOW, 2.0)
-
-	# Draw combo counter inside the ball
+	# Draw combo counter inside the ball (only when needed)
 	if combo_level > 0:
 		var combo_text = str(combo_level)
 		draw_string(ThemeDB.fallback_font, Vector2(-8, 8), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
@@ -139,11 +82,9 @@ func _physics_process(delta):
 		velocity = Vector2.ZERO
 		return
 
-	# Decay feedback effects
+	# Decay feedback effects (visual feedback moved to UI)
 	if feedback_timer > 0:
 		feedback_timer -= delta
-		feedback_scale = lerp(feedback_scale, 1.0, delta * 5.0)
-		queue_redraw()
 
 	# Apply gravity (only when not on floor)
 	if not is_on_floor():
@@ -198,7 +139,7 @@ func _physics_process(delta):
 	# RHYTHM-BASED BOUNCE SYSTEM WITH COMBO
 	if is_grounded:
 		bounce_timer += delta
-		queue_redraw()  # Redraw to update timing ring
+		# Don't redraw every frame - let UI handle timing display
 
 		# Check timing window
 		var time_until_bounce = current_bounce_interval - bounce_timer
@@ -252,15 +193,9 @@ func execute_bounce(bounce_velocity: float, quality: String):
 		# Emit jump signal with quality
 		jumped.emit(quality)
 
-		# Visual feedback based on quality (stronger with combo)
-		if quality == "great":
+		# Visual feedback timer (actual visuals handled by UI for performance)
+		if quality == "great" or quality == "perfect":
 			feedback_timer = 0.3
-			feedback_scale = 1.3 + (combo_level * 0.1)
-		elif quality == "perfect":
-			feedback_timer = 0.2
-			feedback_scale = 1.15 + (combo_level * 0.05)
-
-		queue_redraw()
 
 func on_landed():
 	is_grounded = true

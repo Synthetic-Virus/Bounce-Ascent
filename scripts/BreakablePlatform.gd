@@ -11,7 +11,10 @@ func _ready():
 func _process(delta):
 	if is_broken and break_progress < 1.0:
 		break_progress += delta / BREAK_TIME
-		queue_redraw()  # Redraw to show dissolve effect
+
+		# Update sprite transparency directly (no redraw needed)
+		if sprite:
+			sprite.modulate.a = 1.0 - break_progress
 
 		# Disable collision when 80% dissolved
 		if break_progress >= 0.8:
@@ -28,11 +31,6 @@ func on_player_land():
 		is_broken = true
 		GameManager.increment_platform_broken()
 		create_break_particles()
-
-func _draw():
-	# Draw dissolve effect - modify sprite transparency instead of drawing cracks
-	if is_broken and break_progress > 0.0 and sprite:
-		sprite.modulate.a = 1.0 - break_progress
 
 func create_break_particles():
 	# Simple particle effect using multiple small squares
