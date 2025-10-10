@@ -7,6 +7,9 @@ const KEY_PART_1 = "BounceAscent"
 const KEY_PART_2 = "SecureGame"
 const KEY_PART_3 = "2024Edition"
 
+# Global game font
+var game_font: FontFile = null
+
 # Current game session data
 var current_profile: Dictionary = {}
 var session_stats: Dictionary = {
@@ -28,6 +31,10 @@ signal profile_loaded(profile_data: Dictionary)
 signal stats_updated(stats: Dictionary)
 
 func _ready():
+	# Load game font
+	game_font = FontFile.new()
+	game_font.load_dynamic_font("res://assets/fonts/Kenney High.ttf")
+
 	load_or_create_profile()
 
 func _notification(what):

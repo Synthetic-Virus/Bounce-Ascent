@@ -5,11 +5,11 @@ const MOVE_SPEED = 300.0
 
 # Rhythm-based bounce system
 const BOUNCE_BASE = -300.0          # Base automatic bounce
-const BOUNCE_PERFECT = -500.0       # Perfect timing (green window)
-const BOUNCE_GREAT = -750.0         # Great timing (yellow window)
+const BOUNCE_GREAT = -500.0         # Great timing (yellow window - good power)
+const BOUNCE_PERFECT = -750.0       # Perfect timing (green window - best power)
 const BOUNCE_INTERVAL = 1.5         # Rhythm interval in seconds (gets faster with combo)
-const TIMING_WINDOW_PERFECT = 0.2   # Perfect window (green) - 0.2s before bounce
-const TIMING_WINDOW_GREAT = 0.1     # Great window (yellow) - 0.1s before bounce
+const TIMING_WINDOW_GREAT = 0.2     # Great window (yellow) - 0.2s before bounce
+const TIMING_WINDOW_PERFECT = 0.1   # Perfect window (green) - 0.1s before bounce
 const COMBO_INTERVAL_REDUCTION = 0.1  # Reduce interval by this much per combo
 const MIN_BOUNCE_INTERVAL = 0.5     # Minimum interval (max speed)
 const COMBO_VELOCITY_BONUS = -50.0  # Extra velocity per combo level
@@ -34,6 +34,10 @@ var player_radius: float = 16.0
 # Customization
 var ball_color: Color = Color(0.29, 0.62, 1.0)
 
+# Sprite
+var ball_sprite: Sprite2D = null
+var ball_texture: Texture2D = null
+
 # Signals
 signal landed_on_platform(platform)
 signal attempted_edge_escape()
@@ -50,6 +54,17 @@ func _ready():
 	collision.shape = circle
 	add_child(collision)
 
+	# Set up sprite
+	ball_sprite = Sprite2D.new()
+	ball_texture = load("res://assets/sprites/player-ball.png")
+	ball_sprite.texture = ball_texture
+
+	# Scale down the 512x512 sprite to match our player radius (32px diameter)
+	ball_sprite.scale = Vector2(0.0625, 0.0625)  # 32/512 = 0.0625
+	ball_sprite.centered = true
+	ball_sprite.modulate = ball_color
+	add_child(ball_sprite)
+
 	# Set z_index for proper layering
 	z_index = 10
 
@@ -57,24 +72,50 @@ func _ready():
 	queue_redraw()
 
 func _draw():
-	# Simple optimized ball sprite - just draw a circle with outline
-	# Remove complex procedural rendering for better performance
-	var draw_radius = player_radius
+	# Draw timing indicator ring when grounded
+	if is_grounded and physics_enabled:
+		var ring_radius = player_radius + 12
+		var progress = bounce_timer / current_bounce_interval
 
-	# Draw black outline
-	draw_circle(Vector2.ZERO, draw_radius + 3, Color.BLACK)
+		# Draw background ring (dark gray, semi-transparent)
+		draw_arc(Vector2.ZERO, ring_radius, 0, TAU, 32, Color(0.2, 0.2, 0.2, 0.5), 4.0, true)
 
-	# Draw ball with custom color
-	draw_circle(Vector2.ZERO, draw_radius, ball_color)
+		# Determine ring color based on timing window with gradient
+		# Grey (start) -> Yellow (GREAT window) -> Green (PERFECT window/best)
+		var time_until_bounce = current_bounce_interval - bounce_timer
+		var ring_color = Color.WHITE
 
-	# Simple highlight for 3D effect
-	var lighter = ball_color.lightened(0.3)
-	draw_circle(Vector2(-4, -4), draw_radius * 0.25, Color(lighter, 0.6))
+		if time_until_bounce <= TIMING_WINDOW_PERFECT:
+			# PERFECT window (best timing!) - Bright Green (best power)
+			ring_color = Color(0.2, 1.0, 0.2)
+		elif time_until_bounce <= TIMING_WINDOW_GREAT:
+			# GREAT window - Gradient from Yellow to Green as we approach PERFECT
+			var window_progress = (TIMING_WINDOW_GREAT - time_until_bounce) / (TIMING_WINDOW_GREAT - TIMING_WINDOW_PERFECT)
+			ring_color = Color(1.0, 0.85, 0.0).lerp(Color(0.2, 1.0, 0.2), window_progress)
+		else:
+			# Normal - Gradient from Grey to Yellow as we approach GREAT window
+			var time_to_great = time_until_bounce - TIMING_WINDOW_GREAT
+			var max_time = current_bounce_interval - TIMING_WINDOW_GREAT
+			var gradient_progress = 1.0 - (time_to_great / max_time)
+
+			# Blend from grey to yellow
+			ring_color = Color(0.6, 0.6, 0.6).lerp(Color(1.0, 0.85, 0.0), gradient_progress)
+
+		# Draw progress ring (fills clockwise from top)
+		var start_angle = -PI / 2  # Start at top
+		var end_angle = start_angle + (progress * TAU)
+		draw_arc(Vector2.ZERO, ring_radius, start_angle, end_angle, 32, ring_color, 4.0, true)
 
 	# Draw combo counter inside the ball (only when needed)
-	if combo_level > 0:
+	if combo_level > 0 and GameManager.game_font:
 		var combo_text = str(combo_level)
-		draw_string(ThemeDB.fallback_font, Vector2(-8, 8), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
+		# Draw black outline for text
+		for x_offset in [-1, 0, 1]:
+			for y_offset in [-1, 0, 1]:
+				if x_offset != 0 or y_offset != 0:
+					draw_string(GameManager.game_font, Vector2(-8 + x_offset, 8 + y_offset), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 28, Color.BLACK)
+		# Draw white text on top
+		draw_string(GameManager.game_font, Vector2(-8, 8), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 28, Color.WHITE)
 
 func _physics_process(delta):
 	# Don't process physics until game starts
@@ -139,24 +180,25 @@ func _physics_process(delta):
 	# RHYTHM-BASED BOUNCE SYSTEM WITH COMBO
 	if is_grounded:
 		bounce_timer += delta
-		# Don't redraw every frame - let UI handle timing display
+		# Redraw to update timing ring
+		queue_redraw()
 
 		# Check timing window
 		var time_until_bounce = current_bounce_interval - bounce_timer
-		var in_perfect_window = time_until_bounce <= TIMING_WINDOW_PERFECT and time_until_bounce > TIMING_WINDOW_GREAT
-		var in_great_window = time_until_bounce <= TIMING_WINDOW_GREAT and time_until_bounce > 0
+		var in_great_window = time_until_bounce <= TIMING_WINDOW_GREAT and time_until_bounce > TIMING_WINDOW_PERFECT
+		var in_perfect_window = time_until_bounce <= TIMING_WINDOW_PERFECT and time_until_bounce > 0
 
 		# Player pressed jump - check timing
 		if jump_just_pressed:
-			if in_great_window:
-				# GREAT timing! (yellow window) - increase combo
-				combo_level += 1
-				execute_bounce(BOUNCE_GREAT + (combo_level * COMBO_VELOCITY_BONUS), "great")
-				update_bounce_interval()
-			elif in_perfect_window:
-				# PERFECT timing! (green window) - increase combo
+			if in_perfect_window:
+				# PERFECT timing! (green window - best power) - increase combo
 				combo_level += 1
 				execute_bounce(BOUNCE_PERFECT + (combo_level * COMBO_VELOCITY_BONUS), "perfect")
+				update_bounce_interval()
+			elif in_great_window:
+				# GREAT timing! (yellow window - good power) - increase combo
+				combo_level += 1
+				execute_bounce(BOUNCE_GREAT + (combo_level * COMBO_VELOCITY_BONUS), "great")
 				update_bounce_interval()
 			else:
 				# Early or late - reset combo

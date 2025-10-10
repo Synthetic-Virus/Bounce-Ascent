@@ -37,11 +37,11 @@ func _process(delta):
 
 			# Color code based on timing window
 			if time_until <= 0.1:
-				rhythm_label.add_theme_color_override("font_color", Color.YELLOW)
-				timing_text = "PRESS NOW! GREAT"
-			elif time_until <= 0.2:
-				rhythm_label.add_theme_color_override("font_color", Color.GREEN)
+				rhythm_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))  # Bright green
 				timing_text = "PRESS NOW! PERFECT"
+			elif time_until <= 0.2:
+				rhythm_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))  # Yellow
+				timing_text = "PRESS NOW! GREAT"
 			else:
 				rhythm_label.add_theme_color_override("font_color", Color.WHITE)
 
@@ -69,16 +69,16 @@ func _on_player_jumped(quality: String):
 func show_jump_feedback():
 	"""Display the jump quality text"""
 	if last_jump_quality == "perfect":
-		rhythm_label.add_theme_color_override("font_color", Color.YELLOW)
-		rhythm_label.text = "CLOSE!"
-	elif last_jump_quality == "great":
-		rhythm_label.add_theme_color_override("font_color", Color.GREEN)
+		rhythm_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))  # Bright green
 		rhythm_label.text = "PERFECT!"
+	elif last_jump_quality == "great":
+		rhythm_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))  # Yellow
+		rhythm_label.text = "GREAT!"
 	else:
 		rhythm_label.text = ""
 
 func animate_close_jump():
-	"""Wiggle animation for close/great jumps"""
+	"""Wiggle animation for GREAT jumps (yellow window, good power)"""
 	var tween = create_tween()
 	tween.set_parallel(true)
 	# Slightly larger font
@@ -90,7 +90,7 @@ func animate_close_jump():
 	tween.tween_property(rhythm_label, "scale", Vector2(1.0, 1.0), 0.2)
 
 func animate_perfect_jump():
-	"""Grow and wiggle animation for perfect jumps"""
+	"""Grow and wiggle animation for PERFECT jumps (green window, best power)"""
 	var tween = create_tween()
 	tween.set_parallel(true)
 	# Much larger font

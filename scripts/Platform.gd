@@ -15,7 +15,7 @@ enum PlatformType {
 		platform_width = value
 		if is_inside_tree():
 			update_collision_and_sprite()
-@export var platform_height: float = 20.0:
+@export var platform_height: float = 40.0:
 	set(value):
 		platform_height = value
 		if is_inside_tree():

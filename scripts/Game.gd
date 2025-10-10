@@ -26,10 +26,10 @@ func _ready():
 	# Add CRT shader overlay (disabled for now - causes white screen)
 	# add_crt_shader()
 
-	# Create camera
+	# Create camera (start at bottom near player)
 	camera = Camera2D.new()
 	camera.set_script(load("res://scripts/GameCamera.gd"))
-	camera.position = Vector2(400, 500)
+	camera.position = Vector2(400, 900)  # Start near bottom with player
 	add_child(camera)
 
 	# Create platform spawner
@@ -38,10 +38,10 @@ func _ready():
 	add_child(platform_spawner)
 	platform_spawner.set_camera(camera)
 
-	# Create player (position closer to camera center for better start)
+	# Create player (start at bottom on ground for seamless transition)
 	player = CharacterBody2D.new()
 	player.set_script(load("res://scripts/Player.gd"))
-	player.position = Vector2(400, 400)  # Higher up, closer to camera
+	player.position = Vector2(400, 920)  # Near bottom, on ground platforms
 	add_child(player)
 
 	# Create UI
@@ -80,29 +80,85 @@ func start_game():
 	# Start camera scrolling (platforms already spawned during countdown)
 	camera.start_scrolling()
 
+var countdown_circle: Node2D
+var climb_label: Label
+
 func create_countdown_label():
+	# Create visual countdown circle that follows player
+	countdown_circle = Node2D.new()
+	countdown_circle.z_index = 100
+	add_child(countdown_circle)
+
+	# Create countdown number label
 	countdown_label = Label.new()
-	countdown_label.add_theme_font_size_override("font_size", 180)
+	countdown_label.add_theme_font_size_override("font_size", 80)
 	countdown_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
 	countdown_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	countdown_label.add_theme_constant_override("outline_size", 12)
+	countdown_label.add_theme_constant_override("outline_size", 8)
 	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	countdown_label.position = Vector2(250, 350)
-	countdown_label.size = Vector2(300, 300)
-	countdown_label.z_index = 200
+	countdown_label.position = Vector2(-40, -100)  # Above player
+	countdown_label.size = Vector2(80, 80)
 	countdown_label.visible = false
-	add_child(countdown_label)
+	countdown_circle.add_child(countdown_label)
+
+	# Create CLIMB label
+	climb_label = Label.new()
+	climb_label.add_theme_font_size_override("font_size", 120)
+	climb_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))  # Gold
+	climb_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	climb_label.add_theme_constant_override("outline_size", 12)
+	climb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	climb_label.position = Vector2(250, 400)
+	climb_label.size = Vector2(300, 150)
+	climb_label.text = "CLIMB!"
+	climb_label.z_index = 200
+	climb_label.visible = false
+	add_child(climb_label)
 
 func start_countdown():
 	countdown_active = true
 	countdown_time = 3.0
 	countdown_label.visible = true
 
+	# Add drawing function to countdown circle
+	countdown_circle.set_script(preload("res://scripts/CountdownCircle.gd"))
+
 	# Spawn platforms but don't start scrolling yet
 	platform_spawner.spawn_initial_platforms()
 
+func show_climb_message():
+	# Show CLIMB label with flash and shake animation
+	climb_label.visible = true
+
+	var tween = create_tween()
+	tween.set_parallel(true)
+
+	# Flash effect
+	tween.tween_property(climb_label, "modulate:a", 0.3, 0.15)
+	tween.tween_property(climb_label, "scale", Vector2(1.3, 1.3), 0.15)
+	tween.chain().tween_property(climb_label, "modulate:a", 1.0, 0.15)
+	tween.chain().tween_property(climb_label, "scale", Vector2(1.0, 1.0), 0.15)
+
+	# Shake effect
+	tween.set_parallel(false)
+	for i in range(6):
+		var offset_x = 10 if i % 2 == 0 else -10
+		tween.tween_property(climb_label, "position:x", 250 + offset_x, 0.05)
+	tween.tween_property(climb_label, "position:x", 250, 0.05)
+
+	# Wait then start game
+	tween.tween_callback(func():
+		climb_label.visible = false
+		start_game()
+	).set_delay(0.5)
+
 func _process(delta):
+	# Update countdown circle position to follow player
+	if countdown_circle and player:
+		countdown_circle.global_position = player.global_position
+		countdown_circle.queue_redraw()
+
 	# Handle countdown
 	if countdown_active:
 		countdown_time -= delta
@@ -111,7 +167,8 @@ func _process(delta):
 		else:
 			countdown_label.visible = false
 			countdown_active = false
-			start_game()
+			# Show CLIMB message with flash/shake
+			show_climb_message()
 		return
 
 	if not game_active:

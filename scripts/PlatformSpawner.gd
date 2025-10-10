@@ -34,26 +34,29 @@ func set_camera(camera: Camera2D):
 
 func spawn_initial_platforms():
 	# Fill entire screen with platforms from bottom (y=1000) to top (y=0)
-	# Player starts at y=400
-	var player_y = 400
+	# Player starts at y=920 (near bottom on ground)
+	var player_y = 920
 	var screen_bottom = 1000
 	var screen_top = 0
 
-	# First platform ALWAYS spawns directly under player (x=400, y=480)
+	# Create ground row of platforms at bottom (at the very bottom edge)
+	# Spawn 7 platforms across the width to create a solid ground
+	for i in range(7):
+		var ground_platform = create_platform_for_difficulty(0)
+		ground_platform.position = Vector2(i * 120 + 60, 990)  # At the very bottom
+		ground_platform.platform_width = 120
+		add_child(ground_platform)
+		platforms.append(ground_platform)
+
+	# First platform ALWAYS spawns directly under player
 	var first_platform = create_platform_for_difficulty(0)
-	first_platform.position = Vector2(400, player_y + 80)  # Centered under player
+	first_platform.position = Vector2(400, player_y + 40)  # Centered under player
 	first_platform.platform_width = 140  # Wider for safety
 	add_child(first_platform)
 	platforms.append(first_platform)
 
-	# Spawn platforms downward from first platform to screen bottom
-	var y_pos = player_y + 80 + INITIAL_VERTICAL_SPACING
-	while y_pos < screen_bottom:
-		spawn_platform_at_height(y_pos, 0)
-		y_pos += INITIAL_VERTICAL_SPACING
-
-	# Spawn platforms upward from first platform to screen top
-	y_pos = player_y + 80 - INITIAL_VERTICAL_SPACING
+	# Spawn platforms upward from player to screen top
+	var y_pos = player_y - INITIAL_VERTICAL_SPACING
 	while y_pos > screen_top:
 		spawn_platform_at_height(y_pos, 0)
 		y_pos -= INITIAL_VERTICAL_SPACING
@@ -103,26 +106,26 @@ func create_platform_for_difficulty(height: int) -> Platform:
 		# Tier 1: Only static platforms
 		platform_script = platform_scene
 	elif height < TIER_3_HEIGHT:
-		# Tier 2: Static + Moving (70% static, 30% moving)
-		if randf() < 0.7:
+		# Tier 2: Static + Moving (50% static, 50% moving)
+		if randf() < 0.5:
 			platform_script = platform_scene
 		else:
 			platform_script = moving_platform_scene
 	elif height < TIER_4_HEIGHT:
-		# Tier 3: Static + Moving + Breakable
+		# Tier 3: Static + Moving + Breakable (30% static, 40% moving, 30% breakable)
 		var rand = randf()
-		if rand < 0.5:
+		if rand < 0.3:
 			platform_script = platform_scene
-		elif rand < 0.8:
+		elif rand < 0.7:
 			platform_script = moving_platform_scene
 		else:
 			platform_script = breakable_platform_scene
 	elif height < TIER_5_HEIGHT:
-		# Tier 4: All types including temporary
+		# Tier 4: All types including temporary (25% static, 35% moving, 25% breakable, 15% temporary)
 		var rand = randf()
-		if rand < 0.4:
+		if rand < 0.25:
 			platform_script = platform_scene
-		elif rand < 0.65:
+		elif rand < 0.60:
 			platform_script = moving_platform_scene
 		elif rand < 0.85:
 			platform_script = breakable_platform_scene

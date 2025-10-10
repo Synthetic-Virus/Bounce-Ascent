@@ -43,6 +43,8 @@ func _ready():
 	# Title
 	title_label = Label.new()
 	title_label.text = "BOUNCE ASCENT"
+	if GameManager.game_font:
+		title_label.add_theme_font_override("font", GameManager.game_font)
 	title_label.add_theme_font_size_override("font_size", 48)
 	title_label.add_theme_color_override("font_color", Color(0.29, 0.62, 1.0))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -55,6 +57,8 @@ func _ready():
 
 	# Profile info
 	profile_info = Label.new()
+	if GameManager.game_font:
+		profile_info.add_theme_font_override("font", GameManager.game_font)
 	profile_info.add_theme_font_size_override("font_size", 18)
 	profile_info.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
 	profile_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -64,6 +68,8 @@ func _ready():
 	play_button = Button.new()
 	play_button.text = "PLAY"
 	play_button.custom_minimum_size = Vector2(200, 50)
+	if GameManager.game_font:
+		play_button.add_theme_font_override("font", GameManager.game_font)
 	play_button.add_theme_font_size_override("font_size", 24)
 	play_button.pressed.connect(_on_play_pressed)
 	apply_rounded_style(play_button)
@@ -73,6 +79,8 @@ func _ready():
 	profile_button = Button.new()
 	profile_button.text = "PROFILE"
 	profile_button.custom_minimum_size = Vector2(200, 50)
+	if GameManager.game_font:
+		profile_button.add_theme_font_override("font", GameManager.game_font)
 	profile_button.add_theme_font_size_override("font_size", 24)
 	profile_button.pressed.connect(_on_profile_pressed)
 	apply_rounded_style(profile_button)
@@ -82,6 +90,8 @@ func _ready():
 	quit_button = Button.new()
 	quit_button.text = "QUIT"
 	quit_button.custom_minimum_size = Vector2(200, 50)
+	if GameManager.game_font:
+		quit_button.add_theme_font_override("font", GameManager.game_font)
 	quit_button.add_theme_font_size_override("font_size", 24)
 	quit_button.pressed.connect(_on_quit_pressed)
 	apply_rounded_style(quit_button)
