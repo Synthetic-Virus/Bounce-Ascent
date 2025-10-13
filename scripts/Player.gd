@@ -35,8 +35,10 @@ var player_radius: float = 16.0
 var ball_color: Color = Color(0.29, 0.62, 1.0)
 
 # Sprite
-var ball_sprite: Sprite2D = null
-var ball_texture: Texture2D = null
+# Node references (from scene)
+@onready var ball_sprite: Sprite2D = $BallSprite
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var combo_label: Label = $ComboLabel
 
 # Signals
 signal landed_on_platform(platform)
@@ -47,26 +49,20 @@ func _ready():
 	# Get ball color from GameManager
 	ball_color = GameManager.get_ball_color()
 
-	# Set up collision shape
-	var collision = CollisionShape2D.new()
-	var circle = CircleShape2D.new()
-	circle.radius = player_radius
-	collision.shape = circle
-	add_child(collision)
-
-	# Set up sprite
-	ball_sprite = Sprite2D.new()
-	ball_texture = load("res://assets/sprites/player-ball.png")
-	ball_sprite.texture = ball_texture
-
-	# Scale down the 512x512 sprite to match our player radius (32px diameter)
-	ball_sprite.scale = Vector2(0.0625, 0.0625)  # 32/512 = 0.0625
-	ball_sprite.centered = true
+	# Apply ball color to sprite
 	ball_sprite.modulate = ball_color
-	add_child(ball_sprite)
+
+	# Scale sprite to match player radius (512x512 sprite → 32px diameter)
+	const SPRITE_SIZE: float = 512.0
+	const PLAYER_DIAMETER: float = 32.0
+	const SPRITE_SCALE: float = PLAYER_DIAMETER / SPRITE_SIZE
+	ball_sprite.scale = Vector2.ONE * SPRITE_SCALE
 
 	# Set z_index for proper layering
 	z_index = 10
+
+	# Hide combo label initially
+	combo_label.visible = false
 
 	# Visual representation
 	queue_redraw()
@@ -106,16 +102,12 @@ func _draw():
 		var end_angle = start_angle + (progress * TAU)
 		draw_arc(Vector2.ZERO, ring_radius, start_angle, end_angle, 32, ring_color, 4.0, true)
 
-	# Draw combo counter inside the ball (only when needed)
-	if combo_level > 0 and GameManager.game_font:
-		var combo_text = str(combo_level)
-		# Draw black outline for text
-		for x_offset in [-1, 0, 1]:
-			for y_offset in [-1, 0, 1]:
-				if x_offset != 0 or y_offset != 0:
-					draw_string(GameManager.game_font, Vector2(-8 + x_offset, 8 + y_offset), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 28, Color.BLACK)
-		# Draw white text on top
-		draw_string(GameManager.game_font, Vector2(-8, 8), combo_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 28, Color.WHITE)
+	# Update combo label visibility and text
+	if combo_level > 0:
+		combo_label.text = str(combo_level)
+		combo_label.visible = true
+	else:
+		combo_label.visible = false
 
 func _physics_process(delta):
 	# Don't process physics until game starts

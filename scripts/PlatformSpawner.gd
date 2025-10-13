@@ -2,10 +2,10 @@ extends Node2D
 
 # Platform generation parameters
 const SCREEN_WIDTH = 800
-const INITIAL_VERTICAL_SPACING = 100  # Pixels between platforms
-const MIN_PLATFORM_WIDTH = 60
-const MAX_PLATFORM_WIDTH = 180
-const SPAWN_DISTANCE_ABOVE_CAMERA = 200  # Spawn platforms this far above visible area
+const INITIAL_VERTICAL_SPACING = 180  # Pixels between platforms (increased for 128px tiles)
+const MIN_PLATFORM_WIDTH = 256  # Minimum 2 tiles (left+right)
+const MAX_PLATFORM_WIDTH = 512  # Maximum 4 tiles (left+2middle+right)
+const SPAWN_DISTANCE_ABOVE_CAMERA = 400  # Spawn platforms this far above visible area
 
 # Difficulty thresholds (based on height)
 const TIER_2_HEIGHT = 50   # Moving platforms
@@ -13,11 +13,8 @@ const TIER_3_HEIGHT = 100  # Breakable platforms
 const TIER_4_HEIGHT = 150  # Temporary platforms
 const TIER_5_HEIGHT = 200  # Increased difficulty
 
-# Platform type scenes
-var platform_scene = preload("res://scripts/Platform.gd")
-var moving_platform_scene = preload("res://scripts/MovingPlatform.gd")
-var breakable_platform_scene = preload("res://scripts/BreakablePlatform.gd")
-var temporary_platform_scene = preload("res://scripts/TemporaryPlatform.gd")
+# Platform type scene (base scene - variants use same scene but different scripts)
+var platform_scene = preload("res://scenes/platforms/Platform.tscn")
 
 # State
 var last_spawn_y: float = 0.0
@@ -39,21 +36,10 @@ func spawn_initial_platforms():
 	var screen_bottom = 1000
 	var screen_top = 0
 
-	# Create ground row of platforms at bottom (at the very bottom edge)
-	# Spawn 7 platforms across the width to create a solid ground
-	for i in range(7):
-		var ground_platform = create_platform_for_difficulty(0)
-		ground_platform.position = Vector2(i * 120 + 60, 990)  # At the very bottom
-		ground_platform.platform_width = 120
-		add_child(ground_platform)
-		platforms.append(ground_platform)
-
-	# First platform ALWAYS spawns directly under player
-	var first_platform = create_platform_for_difficulty(0)
-	first_platform.position = Vector2(400, player_y + 40)  # Centered under player
-	first_platform.platform_width = 140  # Wider for safety
-	add_child(first_platform)
-	platforms.append(first_platform)
+	# Create ground row using ONLY middle pieces across the bottom
+	# Spawn middle tile pieces across the entire screen width
+	# This serves as the starting platform, no need for separate first platform
+	create_ground_row()
 
 	# Spawn platforms upward from player to screen top
 	var y_pos = player_y - INITIAL_VERTICAL_SPACING
@@ -99,63 +85,74 @@ func spawn_platform_at_height(y_position: float, height: int):
 	last_spawn_y = y_position
 
 func create_platform_for_difficulty(height: int) -> Platform:
-	var platform_script = null
+	# Instance the base platform scene
+	var platform = platform_scene.instantiate()
 
-	# Determine platform type based on difficulty tier
+	# Determine platform type and swap script based on difficulty tier
+	var platform_type = Platform.PlatformType.STATIC  # Default
+
 	if height < TIER_2_HEIGHT:
 		# Tier 1: Only static platforms
-		platform_script = platform_scene
+		platform_type = Platform.PlatformType.STATIC
 	elif height < TIER_3_HEIGHT:
 		# Tier 2: Static + Moving (50% static, 50% moving)
 		if randf() < 0.5:
-			platform_script = platform_scene
+			platform_type = Platform.PlatformType.STATIC
 		else:
-			platform_script = moving_platform_scene
+			platform_type = Platform.PlatformType.MOVING
+			platform.set_script(load("res://scripts/MovingPlatform.gd"))
 	elif height < TIER_4_HEIGHT:
 		# Tier 3: Static + Moving + Breakable (30% static, 40% moving, 30% breakable)
 		var rand = randf()
 		if rand < 0.3:
-			platform_script = platform_scene
+			platform_type = Platform.PlatformType.STATIC
 		elif rand < 0.7:
-			platform_script = moving_platform_scene
+			platform_type = Platform.PlatformType.MOVING
+			platform.set_script(load("res://scripts/MovingPlatform.gd"))
 		else:
-			platform_script = breakable_platform_scene
+			platform_type = Platform.PlatformType.BREAKABLE
+			platform.set_script(load("res://scripts/BreakablePlatform.gd"))
 	elif height < TIER_5_HEIGHT:
 		# Tier 4: All types including temporary (25% static, 35% moving, 25% breakable, 15% temporary)
 		var rand = randf()
 		if rand < 0.25:
-			platform_script = platform_scene
+			platform_type = Platform.PlatformType.STATIC
 		elif rand < 0.60:
-			platform_script = moving_platform_scene
+			platform_type = Platform.PlatformType.MOVING
+			platform.set_script(load("res://scripts/MovingPlatform.gd"))
 		elif rand < 0.85:
-			platform_script = breakable_platform_scene
+			platform_type = Platform.PlatformType.BREAKABLE
+			platform.set_script(load("res://scripts/BreakablePlatform.gd"))
 		else:
-			platform_script = temporary_platform_scene
+			platform_type = Platform.PlatformType.TEMPORARY
+			platform.set_script(load("res://scripts/TemporaryPlatform.gd"))
 	else:
 		# Tier 5+: Harder mix
 		var rand = randf()
 		if rand < 0.3:
-			platform_script = platform_scene
+			platform_type = Platform.PlatformType.STATIC
 		elif rand < 0.55:
-			platform_script = moving_platform_scene
+			platform_type = Platform.PlatformType.MOVING
+			platform.set_script(load("res://scripts/MovingPlatform.gd"))
 		elif rand < 0.80:
-			platform_script = breakable_platform_scene
+			platform_type = Platform.PlatformType.BREAKABLE
+			platform.set_script(load("res://scripts/BreakablePlatform.gd"))
 		else:
-			platform_script = temporary_platform_scene
+			platform_type = Platform.PlatformType.TEMPORARY
+			platform.set_script(load("res://scripts/TemporaryPlatform.gd"))
 
-	# Create platform node
-	var platform = StaticBody2D.new()
-	platform.set_script(platform_script)
+	# Set the platform type
+	platform.platform_type = platform_type
+
+	# Set random middle piece count (0-2)
+	platform.middle_piece_count = randi() % 3  # 0, 1, or 2
+
 	return platform
 
 func get_platform_width(height: int) -> float:
-	# Platforms get smaller with height
-	if height < TIER_5_HEIGHT:
-		return randf_range(120, MAX_PLATFORM_WIDTH)
-	else:
-		# Tier 5+: Smaller platforms
-		var reduction = min((height - TIER_5_HEIGHT) * 0.5, 40)
-		return randf_range(MIN_PLATFORM_WIDTH + 20, MAX_PLATFORM_WIDTH - reduction)
+	# Not used anymore - width is determined by middle_piece_count (0-2)
+	# This returns a dummy value for compatibility
+	return 256  # 2 tiles minimum
 
 func get_vertical_spacing(height: int) -> float:
 	# Spacing increases slightly with difficulty
@@ -186,3 +183,48 @@ func clear_all_platforms():
 			platform.queue_free()
 	platforms.clear()
 	last_spawn_y = 0.0
+
+func create_ground_row():
+	"""Create a solid ground made of middle tile pieces"""
+	var spritesheet = load("res://assets/sprites/spritesheet-tiles-double.png")
+	if not spritesheet:
+		push_error("Failed to load spritesheet for ground")
+		return
+
+	# Middle tile piece (7,10) at pixel (896, 1280)
+	var middle_atlas = AtlasTexture.new()
+	middle_atlas.atlas = spritesheet
+	middle_atlas.region = Rect2(896, 1280, 128, 128)
+
+	# Create a Node2D to hold all ground tiles
+	var ground_container = Node2D.new()
+	ground_container.name = "Ground"
+	add_child(ground_container)
+
+	# Spawn middle tiles across the entire screen width
+	var tile_width = 128
+	var num_tiles = ceil(SCREEN_WIDTH / float(tile_width)) + 1  # Extra tile to cover screen
+	var ground_y = 990  # At bottom of screen
+
+	for i in range(num_tiles):
+		var ground_sprite = Sprite2D.new()
+		ground_sprite.texture = middle_atlas
+		ground_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ground_sprite.position = Vector2(i * tile_width + (tile_width / 2), ground_y)
+		ground_container.add_child(ground_sprite)
+
+	# Create a single large collision shape for the entire ground
+	# Thin collision at top surface to prevent ball getting stuck
+	var ground_body = StaticBody2D.new()
+	ground_body.position = Vector2(SCREEN_WIDTH / 2, ground_y)
+	ground_body.add_to_group("platform")
+
+	var ground_collision = CollisionShape2D.new()
+	var ground_shape = RectangleShape2D.new()
+	ground_shape.size = Vector2(SCREEN_WIDTH, 20)  # Thin collision matching platforms
+	ground_collision.shape = ground_shape
+	ground_collision.position = Vector2(0, -54)  # Match platform collision offset
+	ground_body.add_child(ground_collision)
+
+	add_child(ground_body)
+	platforms.append(ground_body)

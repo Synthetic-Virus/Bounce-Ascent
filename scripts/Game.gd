@@ -27,8 +27,8 @@ func _ready():
 	# add_crt_shader()
 
 	# Create camera (start at bottom near player)
-	camera = Camera2D.new()
-	camera.set_script(load("res://scripts/GameCamera.gd"))
+	var camera_scene = load("res://scenes/camera/GameCamera.tscn")
+	camera = camera_scene.instantiate()
 	camera.position = Vector2(400, 900)  # Start near bottom with player
 	add_child(camera)
 
@@ -39,8 +39,8 @@ func _ready():
 	platform_spawner.set_camera(camera)
 
 	# Create player (start at bottom on ground for seamless transition)
-	player = CharacterBody2D.new()
-	player.set_script(load("res://scripts/Player.gd"))
+	var player_scene = load("res://scenes/player/Player.tscn")
+	player = player_scene.instantiate()
 	player.position = Vector2(400, 920)  # Near bottom, on ground platforms
 	add_child(player)
 
@@ -104,13 +104,13 @@ func create_countdown_label():
 
 	# Create CLIMB label
 	climb_label = Label.new()
-	climb_label.add_theme_font_size_override("font_size", 120)
+	climb_label.add_theme_font_size_override("font_size", 80)
 	climb_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))  # Gold
 	climb_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	climb_label.add_theme_constant_override("outline_size", 12)
+	climb_label.add_theme_constant_override("outline_size", 10)
 	climb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	climb_label.position = Vector2(250, 400)
-	climb_label.size = Vector2(300, 150)
+	climb_label.position = Vector2(300, 450)
+	climb_label.size = Vector2(200, 100)
 	climb_label.text = "CLIMB!"
 	climb_label.z_index = 200
 	climb_label.visible = false
@@ -144,8 +144,8 @@ func show_climb_message():
 	tween.set_parallel(false)
 	for i in range(6):
 		var offset_x = 10 if i % 2 == 0 else -10
-		tween.tween_property(climb_label, "position:x", 250 + offset_x, 0.05)
-	tween.tween_property(climb_label, "position:x", 250, 0.05)
+		tween.tween_property(climb_label, "position:x", 300 + offset_x, 0.05)
+	tween.tween_property(climb_label, "position:x", 300, 0.05)
 
 	# Wait then start game
 	tween.tween_callback(func():

@@ -22,18 +22,20 @@ func _ready():
 
 func setup_background(camera: Camera2D):
 	camera_ref = camera
-	# Generate random stars
+	# Make background larger to account for camera zoom
+	size = Vector2(1400, 1800)  # Larger to fill zoomed out view
+	# Generate random stars across larger area
 	for i in range(MAX_STARS):
 		stars.append({
-			"pos": Vector2(randf() * 800, randf() * 1000),
+			"pos": Vector2(randf() * 1400, randf() * 1800),
 			"brightness": randf(),
 			"size": randf_range(1.0, 3.0)
 		})
 
 func _process(_delta):
-	# Follow the camera
+	# Follow the camera - center background on camera with larger offset
 	if camera_ref:
-		global_position = camera_ref.global_position - Vector2(400, 500)
+		global_position = camera_ref.global_position - Vector2(700, 900)
 
 	# Get current height from GameManager
 	var height = GameManager.session_stats.height if GameManager.session_stats.has("height") else 0

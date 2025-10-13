@@ -3,7 +3,7 @@ extends Node2D
 # Get countdown time from parent Game node
 func _draw():
 	var game = get_parent()
-	if not game or not game.has("countdown_time"):
+	if not game or not "countdown_time" in game:
 		return
 
 	var countdown_time = game.countdown_time
