@@ -192,7 +192,7 @@ func _on_player_fell_behind():
 	if game_active:
 		end_game("fell")
 
-func _on_player_landed(platform):
+func _on_player_landed(_platform):
 	# Platform already increments stats via GameManager
 	pass
 
