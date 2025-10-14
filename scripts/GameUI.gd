@@ -172,7 +172,7 @@ func _on_stats_updated(stats: Dictionary):
 
 	# Update timer with format mm:ss (handle large values)
 	var total_seconds = int(stats.time_survived)
-	var minutes = total_seconds / 60
+	var minutes = int(total_seconds / 60.0)
 	var seconds = total_seconds % 60
 	# Cap minutes display at 99 to prevent overflow
 	timer_label.text = "TIME: %d:%02d" % [min(minutes, 99), seconds]

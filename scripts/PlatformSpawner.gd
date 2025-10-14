@@ -34,14 +34,12 @@ func set_camera(camera: Camera2D):
 
 func spawn_initial_platforms():
 	# Fill entire screen with platforms from bottom (y=1000) to top (y=0)
-	# Player starts at y=920 (near bottom on ground)
-	var player_y = 920
-	var screen_bottom = 1000
+	# Player starts at y=800 (on top of Ground scene)
+	var player_y = 800
+	var _screen_bottom = 1000  # Not used, just for documentation
 	var screen_top = 0
 
-	# Create ground row using ONLY middle pieces across the bottom
-	# Spawn middle tile pieces across the entire screen width
-	# This serves as the starting platform, no need for separate first platform
+	# Load the Ground scene as the starting platform
 	create_ground_row()
 
 	# Spawn platforms upward from player to screen top
@@ -87,9 +85,9 @@ func spawn_platform_at_height(y_position: float, height: int):
 
 	# If we hit the edge, spawn on opposite side
 	if x_position <= min_x:
-		x_position = randf_range(SCREEN_WIDTH / 2, max_x)
+		x_position = randf_range(SCREEN_WIDTH / 2.0, max_x)
 	elif x_position >= max_x:
-		x_position = randf_range(min_x, SCREEN_WIDTH / 2)
+		x_position = randf_range(min_x, SCREEN_WIDTH / 2.0)
 
 	platform.position = Vector2(x_position, y_position)
 
@@ -169,10 +167,10 @@ func create_platform_for_difficulty(height: int) -> Platform:
 
 	return platform
 
-func get_platform_width(height: int) -> float:
+func get_platform_width(_height: int) -> float:
 	# Not used anymore - width is determined by middle_piece_count (0-2)
 	# This returns a dummy value for compatibility
-	return 256  # 2 tiles minimum
+	return 256.0  # 2 tiles minimum
 
 func get_vertical_spacing(height: int) -> float:
 	# Spacing increases slightly with difficulty
@@ -205,48 +203,18 @@ func clear_all_platforms():
 	last_spawn_y = 0.0
 
 func create_ground_row():
-	"""Create a solid ground made of middle tile pieces"""
-	var spritesheet = load("res://assets/sprites/spritesheet-tiles-double.png")
-	if not spritesheet:
-		push_error("Failed to load spritesheet for ground")
+	"""Load and instantiate the Ground scene as the starting platform"""
+	var ground_scene = load("res://scenes/Ground.tscn")
+	if not ground_scene:
+		push_error("Failed to load Ground scene")
 		return
 
-	# Middle tile piece (7,10) at pixel (896, 1280)
-	var middle_atlas = AtlasTexture.new()
-	middle_atlas.atlas = spritesheet
-	middle_atlas.region = Rect2(896, 1280, 128, 128)
+	var ground = ground_scene.instantiate()
+	ground.name = "Ground"
+	add_child(ground)
 
-	# Create a Node2D to hold all ground tiles
-	var ground_container = Node2D.new()
-	ground_container.name = "Ground"
-	add_child(ground_container)
-
-	# Spawn middle tiles across the entire screen width
-	var tile_width = 128
-	var num_tiles = ceil(SCREEN_WIDTH / float(tile_width)) + 2  # Extra tiles to ensure edge coverage
-	var ground_y = 936  # Lower position - at bottom of visible screen (1000 - 64 for half tile height)
-
-	# Start from slightly left of screen edge to ensure full coverage
-	var start_x = -tile_width / 2
-	for i in range(num_tiles):
-		var ground_sprite = Sprite2D.new()
-		ground_sprite.texture = middle_atlas
-		ground_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		ground_sprite.position = Vector2(start_x + (i * tile_width) + (tile_width / 2), ground_y)
-		ground_container.add_child(ground_sprite)
-
-	# Create a single large collision shape for the entire ground
-	# Thin collision at top surface to prevent ball getting stuck
-	var ground_body = StaticBody2D.new()
-	ground_body.position = Vector2(SCREEN_WIDTH / 2, ground_y)
-	ground_body.add_to_group("platform")
-
-	var ground_collision = CollisionShape2D.new()
-	var ground_shape = RectangleShape2D.new()
-	ground_shape.size = Vector2(SCREEN_WIDTH, 20)  # Thin collision matching platforms
-	ground_collision.shape = ground_shape
-	ground_collision.position = Vector2(0, -54)  # Match platform collision offset
-	ground_body.add_child(ground_collision)
-
-	add_child(ground_body)
-	platforms.append(ground_body)
+	# Add the collision body to platforms array for tracking
+	var collision_body = ground.get_node("CollisionBody")
+	if collision_body:
+		collision_body.add_to_group("platform")
+		platforms.append(collision_body)

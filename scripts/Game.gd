@@ -42,7 +42,7 @@ func _ready():
 	# Create player (start at bottom on ground for seamless transition)
 	var player_scene = load("res://scenes/player/Player.tscn")
 	player = player_scene.instantiate()
-	player.position = Vector2(400, 920)  # Near bottom, on ground platforms
+	player.position = Vector2(400, 800)  # On top of Ground scene collision
 	add_child(player)
 
 	# Create UI
@@ -232,9 +232,9 @@ func add_crt_shader():
 	# Load and apply the CRT shader
 	var shader = load("res://resources/shaders/crt_shader.gdshader")
 	if shader:
-		var material = ShaderMaterial.new()
-		material.shader = shader
-		crt_rect.material = material
+		var shader_material = ShaderMaterial.new()
+		shader_material.shader = shader
+		crt_rect.material = shader_material
 
 	crt_layer.add_child(crt_rect)
 
