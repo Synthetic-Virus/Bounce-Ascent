@@ -2,7 +2,7 @@ extends Node2D
 
 # Platform generation parameters
 const SCREEN_WIDTH = 800
-const INITIAL_VERTICAL_SPACING = 180  # Pixels between platforms (increased for 128px tiles)
+const INITIAL_VERTICAL_SPACING = 240  # Pixels between platforms (spaced out for better gameplay)
 const MIN_PLATFORM_WIDTH = 256  # Minimum 2 tiles (left+right)
 const MAX_PLATFORM_WIDTH = 512  # Maximum 4 tiles (left+2middle+right)
 const SPAWN_DISTANCE_ABOVE_CAMERA = 400  # Spawn platforms this far above visible area
@@ -203,14 +203,16 @@ func create_ground_row():
 
 	# Spawn middle tiles across the entire screen width
 	var tile_width = 128
-	var num_tiles = ceil(SCREEN_WIDTH / float(tile_width)) + 1  # Extra tile to cover screen
-	var ground_y = 990  # At bottom of screen
+	var num_tiles = ceil(SCREEN_WIDTH / float(tile_width)) + 2  # Extra tiles to ensure edge coverage
+	var ground_y = 936  # Lower position - at bottom of visible screen (1000 - 64 for half tile height)
 
+	# Start from slightly left of screen edge to ensure full coverage
+	var start_x = -tile_width / 2
 	for i in range(num_tiles):
 		var ground_sprite = Sprite2D.new()
 		ground_sprite.texture = middle_atlas
 		ground_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		ground_sprite.position = Vector2(i * tile_width + (tile_width / 2), ground_y)
+		ground_sprite.position = Vector2(start_x + (i * tile_width) + (tile_width / 2), ground_y)
 		ground_container.add_child(ground_sprite)
 
 	# Create a single large collision shape for the entire ground
