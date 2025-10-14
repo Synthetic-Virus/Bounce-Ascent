@@ -1,0 +1,243 @@
+extends Node2D
+
+# Scene references
+var player: CharacterBody2D
+var camera: Camera2D
+var platform_spawner: Node2D
+var ui: CanvasLayer
+var countdown_label: Label
+
+# Game state
+var game_active: bool = false
+var countdown_active: bool = false
+var countdown_time: float = 3.0
+
+var background: ColorRect
+
+func _ready():
+	# Create dynamic background that transitions from sky to space
+	background = ColorRect.new()
+	background.color = Color(0.53, 0.81, 0.92)  # Sky blue
+	background.size = Vector2(800, 1000)
+	background.z_index = -100
+	background.set_script(preload("res://scripts/DynamicBackground.gd"))
+	add_child(background)
+
+	# Add CRT shader overlay (disabled for now - causes white screen)
+	# add_crt_shader()
+
+	# Create camera (start at bottom near player)
+	var camera_scene = load("res://scenes/camera/GameCamera.tscn")
+	camera = camera_scene.instantiate()
+	camera.position = Vector2(400, 900)  # Start near bottom with player
+	add_child(camera)
+
+	# Create platform spawner
+	platform_spawner = Node2D.new()
+	platform_spawner.set_script(load("res://scripts/PlatformSpawner.gd"))
+	add_child(platform_spawner)
+	platform_spawner.set_camera(camera)
+
+	# Create player (start at bottom on ground for seamless transition)
+	var player_scene = load("res://scenes/player/Player.tscn")
+	player = player_scene.instantiate()
+	player.position = Vector2(400, 920)  # Near bottom, on ground platforms
+	add_child(player)
+
+	# Create UI
+	ui = CanvasLayer.new()
+	ui.set_script(load("res://scripts/GameUI.gd"))
+	add_child(ui)
+
+	# Set player reference for rhythm indicator (AFTER add_child so _ready has run)
+	ui.set_player_reference(player)
+
+	# Connect signals
+	camera.player_fell_behind.connect(_on_player_fell_behind)
+	player.landed_on_platform.connect(_on_player_landed)
+
+	# Set player camera reference
+	camera.set_player(player)
+
+	# Setup background with camera reference
+	background.setup_background(camera)
+
+	# Create countdown label
+	create_countdown_label()
+
+	# Start countdown instead of immediate game
+	start_countdown()
+
+func start_game():
+	game_active = true
+
+	# Initialize GameManager session
+	GameManager.start_game_session()
+
+	# Enable player physics now that game is starting
+	player.enable_physics()
+
+	# Start camera scrolling (platforms already spawned during countdown)
+	camera.start_scrolling()
+
+var countdown_circle: Node2D
+var climb_label: Label
+
+func create_countdown_label():
+	# Create visual countdown circle that follows player
+	countdown_circle = Node2D.new()
+	countdown_circle.z_index = 100
+	add_child(countdown_circle)
+
+	# Create countdown number label
+	countdown_label = Label.new()
+	countdown_label.add_theme_font_size_override("font_size", 80)
+	countdown_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	countdown_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	countdown_label.add_theme_constant_override("outline_size", 8)
+	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	countdown_label.position = Vector2(-40, -100)  # Above player
+	countdown_label.size = Vector2(80, 80)
+	countdown_label.visible = false
+	countdown_circle.add_child(countdown_label)
+
+	# Create CLIMB label
+	climb_label = Label.new()
+	climb_label.add_theme_font_size_override("font_size", 80)
+	climb_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))  # Gold
+	climb_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	climb_label.add_theme_constant_override("outline_size", 10)
+	climb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	climb_label.position = Vector2(300, 450)
+	climb_label.size = Vector2(200, 100)
+	climb_label.text = "CLIMB!"
+	climb_label.z_index = 200
+	climb_label.visible = false
+	add_child(climb_label)
+
+func start_countdown():
+	countdown_active = true
+	countdown_time = 3.0
+	countdown_label.visible = true
+
+	# Add drawing function to countdown circle
+	countdown_circle.set_script(preload("res://scripts/CountdownCircle.gd"))
+
+	# Spawn platforms but don't start scrolling yet
+	platform_spawner.spawn_initial_platforms()
+
+func show_climb_message():
+	# Show CLIMB label with flash and shake animation
+	climb_label.visible = true
+
+	var tween = create_tween()
+	tween.set_parallel(true)
+
+	# Flash effect
+	tween.tween_property(climb_label, "modulate:a", 0.3, 0.15)
+	tween.tween_property(climb_label, "scale", Vector2(1.3, 1.3), 0.15)
+	tween.chain().tween_property(climb_label, "modulate:a", 1.0, 0.15)
+	tween.chain().tween_property(climb_label, "scale", Vector2(1.0, 1.0), 0.15)
+
+	# Shake effect
+	tween.set_parallel(false)
+	for i in range(6):
+		var offset_x = 10 if i % 2 == 0 else -10
+		tween.tween_property(climb_label, "position:x", 300 + offset_x, 0.05)
+	tween.tween_property(climb_label, "position:x", 300, 0.05)
+
+	# Wait then start game
+	tween.tween_callback(func():
+		climb_label.visible = false
+		start_game()
+	).set_delay(0.5)
+
+func _process(delta):
+	# Update countdown circle position to follow player
+	if countdown_circle and player:
+		countdown_circle.global_position = player.global_position
+		countdown_circle.queue_redraw()
+
+	# Handle countdown
+	if countdown_active:
+		countdown_time -= delta
+		if countdown_time > 0:
+			countdown_label.text = str(int(ceil(countdown_time)))
+		else:
+			countdown_label.visible = false
+			countdown_active = false
+			# Show CLIMB message with flash/shake
+			show_climb_message()
+		return
+
+	if not game_active:
+		return
+
+	# Update time survived
+	GameManager.update_time_survived(delta)
+
+	# Update height based on player's actual position (how high they've climbed)
+	# Player starts at y=400, moving upward (negative Y) increases height
+	var player_height = max(0, int((400.0 - player.position.y) / 10.0))
+
+	# Update GameManager if player reached new height
+	if player_height > GameManager.session_stats.height:
+		var height_diff = player_height - GameManager.session_stats.height
+		for i in range(height_diff):
+			GameManager.increment_height()
+
+func _on_player_fell_behind():
+	if game_active:
+		end_game("fell")
+
+func _on_player_landed(platform):
+	# Platform already increments stats via GameManager
+	pass
+
+func end_game(death_type: String):
+	game_active = false
+	countdown_active = false  # Stop countdown if still active
+	countdown_label.visible = false  # Hide countdown immediately
+	camera.stop_scrolling()
+
+	# End session and save
+	GameManager.end_game_session(death_type)
+
+	# Show game over screen
+	await get_tree().create_timer(1.0).timeout
+	show_game_over_screen()
+
+func show_game_over_screen():
+	# Store stats in GameManager for GameOver scene to access
+	var game_over_scene = load("res://scenes/GameOver.tscn").instantiate()
+	game_over_scene.stats = GameManager.session_stats.duplicate()
+	get_tree().root.add_child(game_over_scene)
+	get_tree().current_scene.queue_free()
+	get_tree().current_scene = game_over_scene
+
+func add_crt_shader():
+	# Create a CanvasLayer for the CRT shader
+	var crt_layer = CanvasLayer.new()
+	crt_layer.layer = 100  # On top of everything
+	add_child(crt_layer)
+
+	# Create a ColorRect that covers the screen
+	var crt_rect = ColorRect.new()
+	crt_rect.size = Vector2(800, 1000)
+	crt_rect.color = Color(1.0, 1.0, 1.0, 0.0)  # Transparent white
+	crt_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block mouse
+
+	# Load and apply the CRT shader
+	var shader = load("res://resources/shaders/crt_shader.gdshader")
+	if shader:
+		var material = ShaderMaterial.new()
+		material.shader = shader
+		crt_rect.material = material
+
+	crt_layer.add_child(crt_rect)
+
+func _input(event):
+	# ESC to quit
+	if event.is_action_pressed("ui_cancel"):
+		get_tree().quit()

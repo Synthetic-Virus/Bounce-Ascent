@@ -1,0 +1,6 @@
+# Normalize line endings
+* text=auto
+
+# Godot-specific
+*.tscn linguist-language=Godot
+*.gd linguist-language=GDScript

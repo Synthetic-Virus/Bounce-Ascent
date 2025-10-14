@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3 uid="uid://d0tuc4iw5o6u6"]
+
+[ext_resource type="Script" uid="uid://bcyrrkq0fvxc6" path="res://scripts/Player.gd" id="1_player"]
+[ext_resource type="Texture2D" uid="uid://b7dofw20scpts" path="res://assets/sprites/player-ball.png" id="2_texture"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_player"]
+radius = 32.0
+
+[node name="Player" type="CharacterBody2D" groups=["player"]]
+script = ExtResource("1_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_player")
+
+[node name="BallSprite" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("2_texture")
+
+[node name="ComboLabel" type="Label" parent="."]
+offset_left = -50.0
+offset_top = -80.0
+offset_right = 50.0
+offset_bottom = -30.0
+theme_override_font_sizes/font_size = 32
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1

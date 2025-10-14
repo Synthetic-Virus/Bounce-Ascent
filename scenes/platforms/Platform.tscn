@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3 uid="uid://d1e2f3g4h5i6j7k8"]
+
+[ext_resource type="Script" path="res://scripts/Platform.gd" id="1_platform"]
+[ext_resource type="Texture2D" path="res://assets/sprites/spritesheet-tiles-double.png" id="2_spritesheet"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_platform"]
+size = Vector2(120, 40)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_static"]
+atlas = ExtResource("2_spritesheet")
+region = Rect2(896, 1664, 128, 128)
+
+[node name="Platform" type="StaticBody2D" groups=["platform"]]
+script = ExtResource("1_platform")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_platform")
+
+[node name="PlatformSprite" type="Sprite2D" parent="."]
+texture_filter = 1
+texture = SubResource("AtlasTexture_static")
+centered = true

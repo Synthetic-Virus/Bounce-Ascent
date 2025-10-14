@@ -1,0 +1,79 @@
+BOUNCE ASCENT - VERSION 1.2 UPDATE
+===================================
+
+Updated: October 7, 2025 (16:19)
+
+FIXES IN THIS VERSION:
+======================
+
+1. PROFILE EDITOR FIXES
+   ✓ Background is now fully opaque (main menu no longer visible behind it)
+   ✓ CLOSE button now works properly
+   ✓ ESC key can now close the profile editor
+   ✓ Returns to main menu correctly
+
+2. GAME START FIXED
+   ✓ Fixed immediate game over after countdown
+   ✓ Player now starts at better position
+   ✓ Countdown works properly: 3... 2... 1... GO!
+   ✓ Game begins smoothly after countdown
+
+3. TEXT IMPROVEMENTS
+   ✓ Changed "Platforms Landed" to "Platforms Landed On" everywhere
+   ✓ Consistent wording across all screens
+
+4. WINDOWS DEFENDER DOCUMENTATION
+   ✓ Added comprehensive guide explaining the warning
+   ✓ Multiple solutions provided
+   ✓ Quick reference in WINDOWS_DEFENDER.txt
+
+HOW TO UPDATE:
+==============
+
+1. Delete old BounceAscent.exe from your Desktop
+2. Copy new BounceAscent.exe from:
+   \\wsl.localhost\Ubuntu\home\virus\bounce-ascent\exports
+3. Run the new version!
+
+Your save file will carry over automatically - all your stats are preserved!
+
+WHAT'S WORKING NOW:
+===================
+
+✓ Main Menu
+  - Shows Player Name and High Score
+  - PLAY, PROFILE, QUIT buttons
+
+✓ Profile Editor
+  - Change your name
+  - Pick ball color (8 choices)
+  - View all statistics
+  - CLOSE button or ESC to exit
+  - Background properly hides menu
+
+✓ Gameplay
+  - 3-second countdown before start
+  - Ball color matches your choice
+  - Smooth gameplay
+  - No immediate game over!
+
+✓ Game Over Screen
+  - Shows all session stats
+  - "Platforms Landed On" text fixed
+  - RETRY and MAIN MENU buttons work
+
+WINDOWS DEFENDER WARNING:
+=========================
+
+If Windows warns about the .exe:
+1. Click "More info"
+2. Click "Run anyway"
+3. Game starts!
+
+See WINDOWS_DEFENDER.txt for full explanation.
+
+KNOWN ISSUES:
+=============
+None! All reported issues have been fixed.
+
+Enjoy the game! 🎮

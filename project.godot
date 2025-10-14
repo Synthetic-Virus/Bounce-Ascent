@@ -1,0 +1,44 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Bounce Ascent"
+config/description="A challenging platformer where you bounce endlessly upward"
+run/main_scene="res://scenes/MainMenu.tscn"
+config/features=PackedStringArray("4.5", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+GameManager="*res://scripts/GameManager.gd"
+
+[display]
+
+window/size/viewport_width=800
+window/size/viewport_height=1000
+window/size/resizable=false
+window/size/window_width_override=800
+window/size/window_height_override=1000
+window/stretch/mode="canvas_items"
+
+[dotnet]
+
+project/assembly_name="Bounce Ascent"
+
+[physics]
+
+2d/default_gravity=980
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
