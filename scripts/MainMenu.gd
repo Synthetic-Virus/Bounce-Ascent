@@ -26,10 +26,10 @@ func apply_rounded_style(button: Button):
 	button.add_theme_stylebox_override("pressed", pressed)
 
 func _ready():
-	# Set background
+	# Set background - anchor to fill entire viewport
 	var bg = ColorRect.new()
 	bg.color = Color(0.05, 0.05, 0.1)
-	bg.size = Vector2(800, 1000)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.z_index = -100
 	add_child(bg)
 

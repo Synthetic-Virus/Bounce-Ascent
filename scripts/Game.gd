@@ -19,6 +19,7 @@ func _ready():
 	background = ColorRect.new()
 	background.color = Color(0.53, 0.81, 0.92)  # Sky blue
 	background.size = Vector2(800, 1000)
+	background.position = Vector2(0, 0)  # Explicitly set to viewport origin
 	background.z_index = -100
 	background.set_script(preload("res://scripts/DynamicBackground.gd"))
 	add_child(background)
