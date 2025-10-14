@@ -6,6 +6,7 @@ const INITIAL_VERTICAL_SPACING = 240  # Pixels between platforms (spaced out for
 const MIN_PLATFORM_WIDTH = 256  # Minimum 2 tiles (left+right)
 const MAX_PLATFORM_WIDTH = 512  # Maximum 4 tiles (left+2middle+right)
 const SPAWN_DISTANCE_ABOVE_CAMERA = 400  # Spawn platforms this far above visible area
+const MIN_HORIZONTAL_DISTANCE = 200  # Minimum horizontal distance from previous platform
 
 # Difficulty thresholds (based on height)
 const TIER_2_HEIGHT = 50   # Moving platforms
@@ -18,6 +19,7 @@ var platform_scene = preload("res://scenes/platforms/Platform.tscn")
 
 # State
 var last_spawn_y: float = 0.0
+var last_spawn_x: float = 400.0  # Track last platform x position (start center)
 var platforms: Array = []
 var camera_ref: Camera2D = null
 
@@ -25,6 +27,7 @@ signal platform_spawned(platform)
 
 func _ready():
 	last_spawn_y = 0.0
+	last_spawn_x = 400.0  # Start center
 
 func set_camera(camera: Camera2D):
 	camera_ref = camera
@@ -66,11 +69,27 @@ func _process(_delta):
 func spawn_platform_at_height(y_position: float, height: int):
 	var platform = create_platform_for_difficulty(height)
 
-	# Random horizontal position (ensure platform stays on screen)
+	# Calculate horizontal position with spacing from previous platform
 	var platform_width = get_platform_width(height)
-	var min_x = platform_width / 2 + 20
-	var max_x = SCREEN_WIDTH - platform_width / 2 - 20
-	var x_position = randf_range(min_x, max_x)
+	var min_x = platform_width / 2 + 40
+	var max_x = SCREEN_WIDTH - platform_width / 2 - 40
+
+	# Try to spawn platform away from last position (left or right)
+	var x_position: float
+	if randf() < 0.5:
+		# Spawn to the left of previous platform
+		x_position = last_spawn_x - MIN_HORIZONTAL_DISTANCE - randf_range(0, 100)
+		x_position = max(min_x, x_position)  # Clamp to screen bounds
+	else:
+		# Spawn to the right of previous platform
+		x_position = last_spawn_x + MIN_HORIZONTAL_DISTANCE + randf_range(0, 100)
+		x_position = min(max_x, x_position)  # Clamp to screen bounds
+
+	# If we hit the edge, spawn on opposite side
+	if x_position <= min_x:
+		x_position = randf_range(SCREEN_WIDTH / 2, max_x)
+	elif x_position >= max_x:
+		x_position = randf_range(min_x, SCREEN_WIDTH / 2)
 
 	platform.position = Vector2(x_position, y_position)
 
@@ -83,6 +102,7 @@ func spawn_platform_at_height(y_position: float, height: int):
 	platform_spawned.emit(platform)
 
 	last_spawn_y = y_position
+	last_spawn_x = x_position  # Remember this position for next platform
 
 func create_platform_for_difficulty(height: int) -> Platform:
 	# Instance the base platform scene
