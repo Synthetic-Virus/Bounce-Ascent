@@ -2,41 +2,33 @@ extends CharacterBody2D
 
 # Player physics constants
 const MOVE_SPEED = 300.0
+const GRAVITY = 980.0
 
-# Rhythm-based bounce system
-const BOUNCE_BASE = -300.0          # Base automatic bounce
-const BOUNCE_GREAT = -500.0         # Great timing (yellow window - good power)
-const BOUNCE_PERFECT = -750.0       # Perfect timing (green window - best power)
-const BOUNCE_INTERVAL = 1.5         # Rhythm interval in seconds (gets faster with combo)
-const TIMING_WINDOW_GREAT = 0.2     # Great window (yellow) - 0.2s before bounce
-const TIMING_WINDOW_PERFECT = 0.1   # Perfect window (green) - 0.1s before bounce
-const COMBO_INTERVAL_REDUCTION = 0.1  # Reduce interval by this much per combo
-const MIN_BOUNCE_INTERVAL = 0.5     # Minimum interval (max speed)
-const COMBO_VELOCITY_BONUS = -50.0  # Extra velocity per combo level
+# Mario-style super jump system
+const JUMP_NORMAL = -500.0        # Normal jump
+const JUMP_SUPER = -900.0         # Super jump (timed with landing)
+const JUMP_COMBO_BONUS = -100.0   # Extra velocity per combo level
+const LANDING_WINDOW = 0.15       # Time window after landing to press jump for super jump (150ms)
 
 # State variables
-var bounce_timer: float = 0.0
 var is_grounded: bool = false
 var last_platform = null
 var physics_enabled: bool = false  # Don't move until countdown finishes
-var is_touching_edge: bool = false  # Track if already counted edge escape
-var just_pressed_jump: bool = false  # Track jump input for timing
-var last_bounce_quality: String = ""  # "perfect", "great", or "base"
-var feedback_timer: float = 0.0  # Timer for visual feedback effects
-var feedback_scale: float = 1.0  # Scale effect for feedback
-var combo_level: int = 0  # Track successive good bounces
-var current_bounce_interval: float = BOUNCE_INTERVAL  # Dynamic interval
+var is_touching_edge: bool = false
+var time_since_landing: float = 0.0  # Track time since last landing
+var can_super_jump: bool = false     # True during landing window
+var combo_level: int = 0             # Track successive super jumps
+var jump_was_pressed: bool = false   # Track previous frame's jump button state
 
 # Screen boundaries
 var screen_width: int = 800
-var player_radius: float = 16.0
+var player_radius: float = 72.0  # Increased by 50% from 48px
 
 # Customization
 var ball_color: Color = Color(0.29, 0.62, 1.0)
 
 # Sprite
-# Node references (from scene)
-@onready var ball_sprite: Sprite2D = $BallSprite
+@onready var ball_sprite: AnimatedSprite2D = $BallSprite
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var combo_label: Label = $ComboLabel
 
@@ -52,11 +44,15 @@ func _ready():
 	# Apply ball color to sprite
 	ball_sprite.modulate = ball_color
 
-	# Scale sprite to match player radius (512x512 sprite → 32px diameter)
-	const SPRITE_SIZE: float = 512.0
-	const PLAYER_DIAMETER: float = 32.0
+	# Scale sprite to match player radius (128x128 sprite frames → 144px diameter = 72px radius)
+	# Increased by 50% from previous 96px
+	const SPRITE_SIZE: float = 128.0
+	const PLAYER_DIAMETER: float = 144.0
 	const SPRITE_SCALE: float = PLAYER_DIAMETER / SPRITE_SIZE
 	ball_sprite.scale = Vector2.ONE * SPRITE_SCALE
+
+	# Start with idle animation
+	ball_sprite.play("idle")
 
 	# Set z_index for proper layering
 	z_index = 10
@@ -64,76 +60,36 @@ func _ready():
 	# Hide combo label initially
 	combo_label.visible = false
 
-	# Visual representation
-	queue_redraw()
-
-func _draw():
-	# Draw timing indicator ring when grounded
-	if is_grounded and physics_enabled:
-		var ring_radius = player_radius + 12
-		var progress = bounce_timer / current_bounce_interval
-
-		# Draw background ring (dark gray, semi-transparent)
-		draw_arc(Vector2.ZERO, ring_radius, 0, TAU, 32, Color(0.2, 0.2, 0.2, 0.5), 4.0, true)
-
-		# Determine ring color based on timing window with gradient
-		# Grey (start) -> Yellow (GREAT window) -> Green (PERFECT window/best)
-		var time_until_bounce = current_bounce_interval - bounce_timer
-		var ring_color = Color.WHITE
-
-		if time_until_bounce <= TIMING_WINDOW_PERFECT:
-			# PERFECT window (best timing!) - Bright Green (best power)
-			ring_color = Color(0.2, 1.0, 0.2)
-		elif time_until_bounce <= TIMING_WINDOW_GREAT:
-			# GREAT window - Gradient from Yellow to Green as we approach PERFECT
-			var window_progress = (TIMING_WINDOW_GREAT - time_until_bounce) / (TIMING_WINDOW_GREAT - TIMING_WINDOW_PERFECT)
-			ring_color = Color(1.0, 0.85, 0.0).lerp(Color(0.2, 1.0, 0.2), window_progress)
-		else:
-			# Normal - Gradient from Grey to Yellow as we approach GREAT window
-			var time_to_great = time_until_bounce - TIMING_WINDOW_GREAT
-			var max_time = current_bounce_interval - TIMING_WINDOW_GREAT
-			var gradient_progress = 1.0 - (time_to_great / max_time)
-
-			# Blend from grey to yellow
-			ring_color = Color(0.6, 0.6, 0.6).lerp(Color(1.0, 0.85, 0.0), gradient_progress)
-
-		# Draw progress ring (fills clockwise from top)
-		var start_angle = -PI / 2  # Start at top
-		var end_angle = start_angle + (progress * TAU)
-		draw_arc(Vector2.ZERO, ring_radius, start_angle, end_angle, 32, ring_color, 4.0, true)
-
-	# Update combo label visibility and text
-	if combo_level > 0:
-		combo_label.text = str(combo_level)
-		combo_label.visible = true
-	else:
-		combo_label.visible = false
-
 func _physics_process(delta):
 	# Don't process physics until game starts
 	if not physics_enabled:
 		velocity = Vector2.ZERO
 		return
 
-	# Decay feedback effects (visual feedback moved to UI)
-	if feedback_timer > 0:
-		feedback_timer -= delta
+	# Track landing window timing
+	if can_super_jump:
+		time_since_landing += delta
+		if time_since_landing > LANDING_WINDOW:
+			can_super_jump = false
 
-	# Apply gravity (only when not on floor)
+	# Apply gravity
 	if not is_on_floor():
-		velocity.y += _get_gravity().y * delta
+		velocity.y += GRAVITY * delta
 		is_grounded = false
+		# Play idle animation when in mid-air (if not already playing jump animation)
+		if ball_sprite.animation != "jump" and ball_sprite.animation != "idle":
+			ball_sprite.play("idle")
 	else:
 		# Just landed
 		if not is_grounded:
 			on_landed()
 		is_grounded = true
 
-		# Stop gravity from pulling down while grounded
+		# Stop downward velocity while grounded
 		if velocity.y > 0:
 			velocity.y = 0
 
-	# Horizontal movement (explicit key checks)
+	# Horizontal movement
 	var direction = 0.0
 	if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
 		direction = -1.0
@@ -143,99 +99,76 @@ func _physics_process(delta):
 	if direction != 0:
 		velocity.x = direction * MOVE_SPEED
 	else:
-		# Stop much faster when no input (reduce sliding)
+		# Stop quickly when no input
 		velocity.x = move_toward(velocity.x, 0, MOVE_SPEED * delta * 10)
 
-	# Clamp to screen boundaries (prevent going off screen)
+	# Screen boundaries
 	var future_x = position.x + velocity.x * delta
 	if future_x - player_radius < 0 or future_x + player_radius > screen_width:
 		velocity.x = 0
-		# Track edge escape attempts (only count once per contact)
 		if abs(direction) > 0 and not is_touching_edge:
 			attempted_edge_escape.emit()
 			GameManager.increment_edge_escape()
 			is_touching_edge = true
 	else:
-		# Reset flag when away from edge
 		is_touching_edge = false
 
-	# Detect jump button press (not hold - we want the moment of press)
-	var jump_just_pressed = Input.is_action_just_pressed("ui_accept") or \
-		(Input.is_physical_key_pressed(KEY_SPACE) and not just_pressed_jump) or \
-		(Input.is_physical_key_pressed(KEY_W) and not just_pressed_jump) or \
-		(Input.is_physical_key_pressed(KEY_UP) and not just_pressed_jump)
+	# Jump input - detect if button is currently pressed
+	var jump_is_pressed = Input.is_action_pressed("ui_accept") or \
+		Input.is_key_pressed(KEY_SPACE) or \
+		Input.is_key_pressed(KEY_W) or \
+		Input.is_key_pressed(KEY_UP)
 
-	just_pressed_jump = Input.is_physical_key_pressed(KEY_SPACE) or \
-		Input.is_physical_key_pressed(KEY_W) or \
-		Input.is_physical_key_pressed(KEY_UP)
+	# Detect "just pressed" - button is pressed now but wasn't last frame
+	var jump_just_pressed = jump_is_pressed and not jump_was_pressed
+	jump_was_pressed = jump_is_pressed
 
-	# RHYTHM-BASED BOUNCE SYSTEM WITH COMBO
-	if is_grounded:
-		bounce_timer += delta
-		# Redraw to update timing ring
-		queue_redraw()
-
-		# Check timing window
-		var time_until_bounce = current_bounce_interval - bounce_timer
-		var in_great_window = time_until_bounce <= TIMING_WINDOW_GREAT and time_until_bounce > TIMING_WINDOW_PERFECT
-		var in_perfect_window = time_until_bounce <= TIMING_WINDOW_PERFECT and time_until_bounce > 0
-
-		# Player pressed jump - check timing
-		if jump_just_pressed:
-			if in_perfect_window:
-				# PERFECT timing! (green window - best power) - increase combo
-				combo_level += 1
-				execute_bounce(BOUNCE_PERFECT + (combo_level * COMBO_VELOCITY_BONUS), "perfect")
-				update_bounce_interval()
-			elif in_great_window:
-				# GREAT timing! (yellow window - good power) - increase combo
-				combo_level += 1
-				execute_bounce(BOUNCE_GREAT + (combo_level * COMBO_VELOCITY_BONUS), "great")
-				update_bounce_interval()
-			else:
-				# Early or late - reset combo
-				combo_level = 0
-				current_bounce_interval = BOUNCE_INTERVAL
-				execute_bounce(BOUNCE_BASE, "early")
-
-		# Auto-bounce when timer expires - reset combo
-		elif bounce_timer >= current_bounce_interval:
+	# Mario-style super jump: press jump during landing window
+	if is_grounded and jump_just_pressed:
+		if can_super_jump:
+			# SUPER JUMP! Timed correctly with landing
+			combo_level += 1
+			# Each combo adds extra height
+			var jump_velocity = JUMP_SUPER + (combo_level * JUMP_COMBO_BONUS)
+			execute_jump(jump_velocity, "super")
+			can_super_jump = false
+		else:
+			# Normal jump
 			combo_level = 0
-			current_bounce_interval = BOUNCE_INTERVAL
-			execute_bounce(BOUNCE_BASE, "base")
+			execute_jump(JUMP_NORMAL, "normal")
 
 	move_and_slide()
 
-	# Clamp position to screen (hard boundary)
+	# Clamp position to screen
 	position.x = clamp(position.x, player_radius, screen_width - player_radius)
 
-func update_bounce_interval():
-	"""Update bounce interval based on combo level"""
-	current_bounce_interval = max(
-		MIN_BOUNCE_INTERVAL,
-		BOUNCE_INTERVAL - (combo_level * COMBO_INTERVAL_REDUCTION)
-	)
+	# Update combo label
+	if combo_level > 0:
+		combo_label.text = str(combo_level)
+		combo_label.visible = true
+	else:
+		combo_label.visible = false
 
-func execute_bounce(bounce_velocity: float, quality: String):
-	"""Execute a bounce with the given velocity and quality rating"""
+func execute_jump(jump_velocity: float, quality: String):
+	"""Execute a jump with the given velocity"""
 	if is_grounded:
-		velocity.y = bounce_velocity
+		velocity.y = jump_velocity
 		is_grounded = false
-		bounce_timer = 0.0
-		last_bounce_quality = quality
 
-		# Emit jump signal with quality
+		# Play jump animation
+		ball_sprite.play("jump")
+
+		# Emit jump signal
 		jumped.emit(quality)
 
-		# Visual feedback timer (actual visuals handled by UI for performance)
-		if quality == "great" or quality == "perfect":
-			feedback_timer = 0.3
-
 func on_landed():
+	"""Called when player lands on a platform"""
 	is_grounded = true
+	time_since_landing = 0.0
+	can_super_jump = true  # Enable super jump window
 
-	# Reset bounce timer for new landing (don't reset combo here)
-	bounce_timer = 0.0
+	# Play landing animation
+	ball_sprite.play("landing")
 
 	# Check what we landed on
 	for i in range(get_slide_collision_count()):
@@ -253,17 +186,20 @@ func on_landed():
 					collider.on_player_land()
 
 func reset_position(spawn_position: Vector2):
+	"""Reset player to starting position"""
 	position = spawn_position
 	velocity = Vector2.ZERO
-	bounce_timer = 0.0
 	is_grounded = false
 	last_platform = null
 	physics_enabled = false
 	combo_level = 0
-	current_bounce_interval = BOUNCE_INTERVAL
+	can_super_jump = false
+	time_since_landing = 0.0
+	jump_was_pressed = false
 
 func enable_physics():
+	"""Enable physics processing (called after countdown)"""
 	physics_enabled = true
 
 func _get_gravity() -> Vector2:
-	return Vector2(0, ProjectSettings.get_setting("physics/2d/default_gravity"))
+	return Vector2(0, GRAVITY)

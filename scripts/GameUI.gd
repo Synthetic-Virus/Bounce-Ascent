@@ -29,23 +29,17 @@ func _process(delta):
 	if jump_feedback_timer > 0:
 		jump_feedback_timer -= delta
 
-	# Update rhythm indicator if we have player reference
+	# Update super jump indicator if we have player reference
 	if player_ref != null and is_instance_valid(player_ref):
 		if player_ref.is_grounded and player_ref.physics_enabled:
-			var time_until = player_ref.current_bounce_interval - player_ref.bounce_timer
-			var timing_text = "BOUNCE: %.1fs" % time_until
-
-			# Color code based on timing window
-			if time_until <= 0.1:
+			# Show super jump window indicator
+			if player_ref.can_super_jump:
+				var time_remaining = 0.15 - player_ref.time_since_landing
 				rhythm_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))  # Bright green
-				timing_text = "PRESS NOW! PERFECT"
-			elif time_until <= 0.2:
-				rhythm_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))  # Yellow
-				timing_text = "PRESS NOW! GREAT"
+				rhythm_label.text = "JUMP NOW!"
 			else:
-				rhythm_label.add_theme_color_override("font_color", Color.WHITE)
-
-			rhythm_label.text = timing_text
+				rhythm_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+				rhythm_label.text = ""
 		else:
 			# Show jump quality feedback while in air
 			if jump_feedback_timer > 0:
@@ -56,24 +50,19 @@ func _process(delta):
 		rhythm_label.text = ""
 
 func _on_player_jumped(quality: String):
-	"""Called when player jumps with quality: 'perfect', 'great', or other"""
+	"""Called when player jumps with quality: 'super' or 'normal'"""
 	last_jump_quality = quality
-	jump_feedback_timer = 1.0  # Show feedback for 1 second
+	jump_feedback_timer = 0.8  # Show feedback for 0.8 seconds
 
 	# Trigger animation based on quality
-	if quality == "perfect":
+	if quality == "super":
 		animate_perfect_jump()
-	elif quality == "great":
-		animate_close_jump()
 
 func show_jump_feedback():
 	"""Display the jump quality text"""
-	if last_jump_quality == "perfect":
+	if last_jump_quality == "super":
 		rhythm_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))  # Bright green
-		rhythm_label.text = "PERFECT!"
-	elif last_jump_quality == "great":
-		rhythm_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))  # Yellow
-		rhythm_label.text = "GREAT!"
+		rhythm_label.text = "SUPER JUMP!"
 	else:
 		rhythm_label.text = ""
 

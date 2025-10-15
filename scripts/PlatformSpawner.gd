@@ -14,8 +14,8 @@ const TIER_3_HEIGHT = 100  # Breakable platforms
 const TIER_4_HEIGHT = 150  # Temporary platforms
 const TIER_5_HEIGHT = 200  # Increased difficulty
 
-# Platform type scene (base scene - variants use same scene but different scripts)
-var platform_scene = preload("res://scenes/platforms/Platform.tscn")
+# Platform type scene - Now using TileMapPlatform with automatic physics
+var platform_scene = preload("res://scenes/platforms/TileMapPlatform.tscn")
 
 # State
 var last_spawn_y: float = 0.0
@@ -102,7 +102,7 @@ func spawn_platform_at_height(y_position: float, height: int):
 	last_spawn_y = y_position
 	last_spawn_x = x_position  # Remember this position for next platform
 
-func create_platform_for_difficulty(height: int) -> Platform:
+func create_platform_for_difficulty(height: int) -> TileMapPlatform:
 	# Instance the base platform scene
 	var platform = platform_scene.instantiate()
 

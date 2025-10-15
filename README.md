@@ -12,21 +12,25 @@ A challenging 2D endless platformer where you control a bouncing ball that must 
 ## Game Features
 
 ### Core Gameplay
-- **Rhythm-Based Bouncing**: Ball automatically bounces every 1.5 seconds
-- **Timing System**: Press spacebar during timing windows for bonus height:
-  - **PERFECT!** (Green/0.1s window): Maximum height boost
-  - **CLOSE!** (Yellow/0.2s window): Good height boost
-- **Combo System**: Successive successful timings increase:
-  - Bounce speed (faster rhythm, down to 0.5s minimum)
-  - Jump height (-50 velocity per combo level)
-  - Visual feedback (combo counter in ball center)
+- **Mario-Style Super Jump**: Time your jumps perfectly with landing for maximum height
+  - **Normal Jump**: -500 velocity (press jump anytime)
+  - **Super Jump**: -900 velocity (press jump within 150ms of landing)
+  - **Landing Window**: 0.15 second timing window after each landing
+  - **No Button Holding**: Must release and re-press jump button for timing to count
+- **Combo Chain System**: Successive super jumps increase height progressively
+  - Each successful super jump adds -100 velocity bonus
+  - Combo counter displays inside ball
+  - Missing a super jump resets combo to 0
+- **Squash-and-Stretch Animation**: Ball animates with:
+  - Idle, charge, jump, and landing animations
+  - Visual feedback for player actions
 - **Horizontal Movement**: Control left/right with arrow keys or WASD
-- **Scrolling Camera**: Screen scrolls upward - don't fall behind!
-- **Progressive Difficulty**: Game speeds up dramatically in space zone (600+ height)
+- **Following Camera**: Camera follows player while auto-scrolling upward
+- **Aggressive Difficulty**: Game speeds up much faster (2x start speed, 5x acceleration rate)
 
 ### Platform Types
 
-Platforms are built using modular tile pieces from the Kenney platformer pack (128×128 tiles):
+Platforms are built using modular tile pieces from the Kenney platformer pack (128×128 tiles, scaled to 50%):
 
 1. **Static Platforms** (Green grass tiles) - Basic solid platforms with 0-2 random middle pieces
 2. **Moving Platforms** (Yellow) - Oscillate horizontally
@@ -37,6 +41,7 @@ Each platform consists of:
 - **Left edge tile** (rounded left side)
 - **0-2 middle tiles** (for varied platform widths)
 - **Right edge tile** (rounded right side)
+- **Scale**: All platforms rendered at 50% size for tighter gameplay
 
 ### Difficulty Progression
 
@@ -54,9 +59,11 @@ Each platform consists of:
 - **Space (600+)**: Deep space with stars, 2x speed multiplier kicks in
 
 **Speed Scaling:**
-- Base scroll speed: 30 px/s
-- Max scroll speed: 300 px/s (was 120)
-- Space zone (600-1000 height): Progressive speed multiplier up to 2x
+- Initial scroll speed: 50 px/s (2× faster than before)
+- Max scroll speed: 400 px/s
+- Speed increase rate: 2.0 px/s² (5× faster acceleration)
+- Space zone (300+ height): Progressive speed multiplier up to 2.5×
+- Maximum effective speed: 1000 px/s (in deep space)
 
 ### Scoring System
 
@@ -80,33 +87,35 @@ Your score is calculated from:
 ## Controls
 
 - **Left/Right Arrow** or **A/D**: Move horizontally
-- **Spacebar** or **Up Arrow** or **W**: Time your bounce (press during green/yellow timing windows)
-- **ESC**: Return to menu / Quit game
+- **Spacebar** or **Up Arrow** or **W**: Jump (press within 150ms of landing for super jump)
+- **ESC**: Return to menu / Quit game / Close profile editor
 
-### Timing Guide
-- **Visual Ring**: White ring fills around ball showing bounce timer
-- **Green Marker**: PERFECT timing window (0.2s before auto-bounce)
-- **Yellow Marker**: CLOSE timing window (0.1s before auto-bounce)
-- **Combo Counter**: Number inside ball shows current combo streak
-- **Feedback Text**: "PERFECT!" or "CLOSE!" displays after successful timing
+### Jump Timing Guide
+- **Landing Animation**: Watch for the landing animation to play
+- **Timing Window**: 150ms window after landing to press jump for super jump
+- **Button Release Required**: Must release jump button between presses (no holding!)
+- **Combo Counter**: Number inside ball shows current super jump combo streak
+- **Feedback Text**: "SUPER JUMP!" displays after successful timing
+- **Visual Feedback**: Ball plays squash-and-stretch animations during jumps
 
 ## Technical Features
 
 ### Visual Style
-- **Tile-Based Graphics**: Using 128×128 Kenney platformer pack tiles
+- **Tile-Based Graphics**: Using 128×128 Kenney platformer pack tiles (scaled to 50%)
+- **Large Ball Sprite**: 144px diameter ball (50% larger than before)
 - **Modular Platforms**: Dynamic assembly of left, middle, and right tile pieces
+- **Squash-and-Stretch**: Professional ball animation with 4 states (idle, charge, jump, landing)
 - **Pixel Perfect**: Nearest neighbor filtering for crisp retro aesthetics
 - **Camera Zoom**: 0.6× zoom to accommodate larger tile sizes
 - **Black Outlines**: Clean borders on all game elements
 - **Text Outlines**: All UI text has black outlines for readability on any background
-- **Neon Color Palette**: Bright colors with customizable ball colors
+- **Neon Color Palette**: Bright colors with customizable ball colors (8 presets)
 - **Dynamic Background**: Smooth color transitions from sky → sunset → dusk → space (1400×1800px)
 - **Particle Effects**: Break particles when platforms shatter
 - **Animated Feedback**:
-  - CLOSE jumps: 1.2x scale + wiggle animation
-  - PERFECT jumps: 1.5x scale + dramatic wiggle animation
-  - Timing ring with color-coded windows
-  - Combo burst effects
+  - Super jumps: Visual burst and combo counter display
+  - Ball animations react to player actions
+  - Landing animation triggers timing window
 
 ### Anti-Cheat Security
 
@@ -150,10 +159,18 @@ bounce-ascent/
 ### Key Systems
 
 - **GameManager** (Singleton): Handles profiles, save/load, statistics, anti-cheat
-- **Player**: Physics-based character controller with jump mechanics
+- **Player**: Physics-based character controller with Mario-style super jump mechanics
+  - Manual edge detection for button input (prevents holding exploit)
+  - Combo chain system with progressive height scaling
+  - Ball animation state machine
 - **PlatformSpawner**: Procedural platform generation with difficulty scaling
-- **GameCamera**: Scrolling camera with death zone detection
-- **Platform Types**: Base class with specialized variants (moving, breakable, temporary)
+- **GameCamera**: Player-following camera with aggressive auto-scroll
+  - Smooth lerp following (follow_smoothness = 5.0)
+  - Progressive speed increase (2.0 px/s²)
+  - Space zone speed multiplier (up to 2.5×)
+- **Platform Types**: TileMapLayer-based platforms with physics
+  - Base class with specialized variants (moving, breakable, temporary)
+  - 50% scale for tighter gameplay
 
 ## 🚀 Getting Started
 

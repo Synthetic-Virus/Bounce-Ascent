@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://tilemap_platform_001"]
+
+[ext_resource type="Script" path="res://scripts/TileMapPlatform.gd" id="1_script"]
+[ext_resource type="TileSet" uid="uid://codrrqvosjtvt" path="res://assets/tilesets/platform_tileset.tres" id="2_tileset"]
+
+[node name="TileMapPlatform" type="Node2D" groups=["platform"]]
+script = ExtResource("1_script")
+
+[node name="PlatformTiles" type="TileMapLayer" parent="."]
+use_parent_material = true
+tile_set = ExtResource("2_tileset")

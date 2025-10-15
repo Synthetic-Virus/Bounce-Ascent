@@ -5,6 +5,93 @@ All notable changes to Bounce Ascent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-10-14
+
+### 🎮 Gameplay Overhaul - Mario-Style Jump System
+
+#### Changed
+- **Complete Jump Mechanic Redesign**
+  - Removed rhythm-based auto-bounce system entirely
+  - Implemented Mario-style super jump timing mechanic
+  - Normal jumps: -500 velocity (any time)
+  - Super jumps: -900 velocity (within 150ms landing window)
+  - Combo chain system: Each successful super jump adds -100 velocity bonus
+  - Landing window: 0.15 seconds after touching platform
+
+- **Button Input Anti-Exploit**
+  - Manual edge detection prevents button holding exploit
+  - Players must release and re-press jump button for timing to count
+  - Jump state tracked across frames to detect actual button presses
+  - Fixed: Holding spacebar no longer counts as perfectly timed jumps
+
+- **Camera System Overhaul**
+  - Changed from fixed auto-scroll to player-following camera
+  - Camera follows player with smooth lerp (follow_smoothness = 5.0)
+  - Uses `min(target_y, player.y)` to never slow down while following
+  - Maintains upward pressure while staying centered on player
+
+- **Aggressive Difficulty Scaling**
+  - Initial scroll speed: 50 px/s (was 25 px/s) - **2× faster start**
+  - Max scroll speed: 400 px/s (was 250 px/s) - **60% increase**
+  - Speed increase rate: 2.0 px/s² (was 0.4 px/s²) - **5× faster acceleration**
+  - Space zone starts at height 300 (was 600) - **earlier difficulty spike**
+  - Space zone duration: 200 height (was 400) - **tighter ramp**
+  - Space multiplier: 2.5× (was 2.0×) - **25% faster in space**
+  - Maximum effective speed: 1000 px/s (400 × 2.5)
+
+- **Visual Scaling Adjustments**
+  - Platforms scaled to 50% size (128px tiles → 64px rendered)
+  - Ball increased 50% in size: 96px → 144px diameter
+  - Player collision radius updated: 48px → 72px
+  - Tighter, more challenging platform spacing
+
+#### Added
+- **Ball Squash-and-Stretch Animation**
+  - 4-state animation system: idle, charge_jump, jump, landing
+  - 128×128 sprite frames from custom ball sprite sheet
+  - Visual feedback tied to player actions
+  - Animations trigger on landing, jumping, and idle states
+
+- **Countdown Removal**
+  - Removed 3-second countdown system
+  - Game starts immediately when entering play scene
+  - Physics enabled right away for faster gameplay loop
+
+#### Removed
+- All rhythm-based bounce variables (bounce_timer, current_bounce_interval)
+- Timing window system (PERFECT/CLOSE markers)
+- Auto-bounce functionality
+- Countdown circle and "CLIMB!" message
+- Rhythm feedback UI elements
+
+#### Fixed
+- GameUI.gd accessing removed rhythm variables
+- Button holding exploit allowing free super jumps
+- Parser error from non-existent `is_physical_key_just_pressed()` function
+- Collision radius mismatch with new ball size
+
+#### Technical Changes
+- **Player.gd**: Complete rewrite for Mario jump system
+  - Added `can_super_jump`, `time_since_landing`, `jump_was_pressed` variables
+  - Implemented manual button edge detection logic
+  - Progressive combo velocity calculation
+  - Ball animation state machine integration
+
+- **GameCamera.gd**: Player-following with aggressive difficulty
+  - Dual tracking: scroll target vs player position
+  - Exponential difficulty curve in space zone
+  - Smooth camera interpolation
+
+- **TileMapPlatform.gd**: 50% scale applied to all platforms
+- **Player.tscn**: Updated collision shape and ball sprite animations
+- **Game.gd**: Removed countdown initialization logic
+- **GameUI.gd**: Updated for super jump feedback system
+
+### Performance
+- Removed unused countdown label nodes
+- Simplified input detection (manual edge detection faster than multiple Input checks)
+- Removed rhythm timing calculations every frame
+
 ## [0.1.1] - 2025-10-13
 
 ### Added
@@ -130,5 +217,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Minor (0.X.0)**: New features, significant updates
 - **Patch (0.0.X)**: Bug fixes, minor tweaks
 
+[0.2.0]: https://github.com/Synthetic-Virus/Bounce-Ascent/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Synthetic-Virus/Bounce-Ascent/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Synthetic-Virus/Bounce-Ascent/releases/tag/v0.1.0

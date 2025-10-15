@@ -1,10 +1,76 @@
-[gd_scene load_steps=4 format=3 uid="uid://d0tuc4iw5o6u6"]
+[gd_scene load_steps=9 format=3 uid="uid://d0tuc4iw5o6u6"]
 
 [ext_resource type="Script" uid="uid://bcyrrkq0fvxc6" path="res://scripts/Player.gd" id="1_player"]
-[ext_resource type="Texture2D" uid="uid://b7dofw20scpts" path="res://assets/sprites/player-ball.png" id="2_texture"]
+[ext_resource type="Texture2D" uid="uid://ckkx5pvbq6h7j" path="res://assets/sprites/ball-animation.png" id="1_texture"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
-radius = 32.0
+radius = 13.038404
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle"]
+atlas = ExtResource("1_texture")
+region = Rect2(0, 0, 128, 128)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_squash"]
+atlas = ExtResource("1_texture")
+region = Rect2(128, 0, 128, 128)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_stretch_2"]
+atlas = ExtResource("1_texture")
+region = Rect2(0, 256, 128, 128)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_stretch_1"]
+atlas = ExtResource("1_texture")
+region = Rect2(0, 128, 128, 128)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_ball"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle")
+}, {
+"duration": 2.0,
+"texture": SubResource("AtlasTexture_squash")
+}],
+"loop": false,
+"name": &"charge_jump",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 3.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_stretch_2")
+}, {
+"duration": 2.0,
+"texture": SubResource("AtlasTexture_stretch_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle")
+}],
+"loop": false,
+"name": &"jump",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 2.0,
+"texture": SubResource("AtlasTexture_stretch_1")
+}, {
+"duration": 2.0,
+"texture": SubResource("AtlasTexture_stretch_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle")
+}],
+"loop": false,
+"name": &"landing",
+"speed": 5.0
+}]
 
 [node name="Player" type="CharacterBody2D" groups=["player"]]
 script = ExtResource("1_player")
@@ -12,16 +78,17 @@ script = ExtResource("1_player")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_player")
 
-[node name="BallSprite" type="Sprite2D" parent="."]
+[node name="BallSprite" type="AnimatedSprite2D" parent="."]
 texture_filter = 1
-scale = Vector2(0.13, 0.13)
-texture = ExtResource("2_texture")
+sprite_frames = SubResource("SpriteFrames_ball")
+animation = &"idle"
 
 [node name="ComboLabel" type="Label" parent="."]
-offset_left = -50.0
-offset_top = -80.0
-offset_right = 50.0
-offset_bottom = -30.0
+offset_left = -12.0
+offset_top = -12.0
+offset_right = 41.0
+offset_bottom = 33.0
+scale = Vector2(0.5, 0.5)
 theme_override_font_sizes/font_size = 32
 text = "0"
 horizontal_alignment = 1

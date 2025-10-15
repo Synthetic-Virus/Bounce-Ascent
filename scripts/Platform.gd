@@ -38,12 +38,29 @@ func _ready():
 	# Groups are already set in scene, but ensure it's there
 	add_to_group("platform")
 
-	# Update collision shape size
-	if collision and collision.shape:
-		collision.shape.size = Vector2(platform_width, platform_height)
-
-	# Set up sprite based on platform type
+	# Set up sprite based on platform type FIRST (this calculates correct platform_width)
 	setup_modular_platform()
+
+	# THEN update collision shape size (now platform_width is correct)
+	# Use 40px collision height - thin enough for good gameplay, thick enough to prevent phase-through
+	if collision and collision.shape:
+		collision.shape.size = Vector2(platform_width, 40)  # 40px collision height
+
+func _draw():
+	# Draw collision box outline for debugging
+	if collision and collision.shape:
+		var rect_shape = collision.shape as RectangleShape2D
+		if rect_shape:
+			var rect_size = rect_shape.size
+			var rect_pos = collision.position
+
+			# Draw red rectangle outline showing collision box
+			draw_rect(
+				Rect2(rect_pos.x - rect_size.x / 2, rect_pos.y - rect_size.y / 2, rect_size.x, rect_size.y),
+				Color(1, 0, 0, 0.5),  # Red, semi-transparent
+				false,  # false = outline only
+				2.0  # Line width
+			)
 
 func update_collision_and_sprite():
 	# Update collision shape
@@ -133,21 +150,23 @@ func setup_modular_platform():
 	platform_width = total_width
 	platform_height = tile_height
 
-	# Update collision to match actual platform width
-	# Use a THIN rectangular collision at the very TOP of the grass surface
-	# This prevents the ball from getting stuck inside platforms
-	if collision and collision.shape:
-		collision.shape.size = Vector2(total_width, 20)  # Thin 20px collision at top
-		collision.position = Vector2(0, -54)  # Position at very top of tile (-64 + 10)
+	# Position collision at the top of the platform
+	# Collision size will be set in _ready() after this function completes
+	# Y position: -44 keeps 40px collision at the very top of the 128px tile
+	if collision:
+		collision.position = Vector2(0, -44)  # Centered horizontally, top of tile vertically
 
-	# Position offset to start from left edge
-	var start_x = -(total_width / 2.0) + (tile_width / 2.0)
+	# Calculate sprite positions to center the entire platform around x=0
+	# For centered sprites, we need to position them so the whole platform is centered
+	# Example: 2 tiles (256px) -> left at -64, right at +64 (centers of 128px sprites)
+	# Example: 3 tiles (384px) -> left at -128, middle at 0, right at +128
+	var half_width = total_width / 2.0
 
-	# Create LEFT piece
+	# Create LEFT piece (first tile, positioned at left side)
 	left_sprite = Sprite2D.new()
 	left_sprite.texture = left_atlas
 	left_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	left_sprite.position = Vector2(start_x, 0)
+	left_sprite.position = Vector2(-half_width + (tile_width / 2.0), 0)
 	add_child(left_sprite)
 
 	# Create MIDDLE pieces (0-2)
@@ -155,15 +174,15 @@ func setup_modular_platform():
 		var middle_spr = Sprite2D.new()
 		middle_spr.texture = middle_atlas
 		middle_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		middle_spr.position = Vector2(start_x + tile_width * (i + 1), 0)
+		middle_spr.position = Vector2(-half_width + (tile_width / 2.0) + tile_width * (i + 1), 0)
 		add_child(middle_spr)
 		middle_sprites.append(middle_spr)
 
-	# Create RIGHT piece
+	# Create RIGHT piece (last tile, positioned at right side)
 	right_sprite = Sprite2D.new()
 	right_sprite.texture = right_atlas
 	right_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	right_sprite.position = Vector2(start_x + tile_width * (middle_piece_count + 1), 0)
+	right_sprite.position = Vector2(-half_width + (tile_width / 2.0) + tile_width * (middle_piece_count + 1), 0)
 	add_child(right_sprite)
 
 func on_player_land():
