@@ -42,9 +42,7 @@ func _ready() -> void:
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(half_width * 2.0, half_height * 2.0)
 	_shape.shape = rect
-	_shape.one_way_collision = true
 	_shape.one_way_collision_margin = 8.0
-
 	collision_layer = 2
 	collision_mask = 0
 	set_process(true)
@@ -80,6 +78,12 @@ func setup(
 			half_width * 2.0, half_height * 2.0)
 
 	_set_solid(true)
+	# SOLID is the only type that is not one-way. Everything else must be
+	# passable from below or the player could never land on it, since they
+	# always approach from the tier beneath.
+	if _shape != null:
+		_shape.one_way_collision = new_type != Tuning.PlatformType.SOLID
+
 	visible = true
 	queue_redraw()
 
@@ -156,7 +160,15 @@ func _draw() -> void:
 				(w + expand) * 2.0, (h + expand) * 2.0),
 			Color(col.r, col.g, col.b, (0.045 + _flash * 0.09) * alpha), true)
 
-	if is_solid():
+	if type == Tuning.PlatformType.SOLID:
+		# Drawn as a slab with a hard edge, so "you cannot pass through this"
+		# is legible at a glance and at speed.
+		var slab := Rect2(-w, -h * 1.8, w * 2.0, h * 3.6)
+		draw_rect(slab, Color(col.r * 0.35, col.g * 0.38, col.b * 0.5, alpha), true)
+		draw_rect(slab, Color(col.r, col.g, col.b, alpha * 0.9), false, 2.0)
+		draw_rect(Rect2(-w, -h * 1.8, w * 2.0, 4.0),
+			Color(col.r, col.g, col.b, alpha), true)
+	elif is_solid():
 		draw_rect(Rect2(-w, -h, w * 2.0, h * 2.0),
 			Color(col.r, col.g, col.b, alpha), true)
 	else:
@@ -167,7 +179,7 @@ func _draw() -> void:
 
 	# The top edge is the surface actually landed on, so it gets the highest
 	# contrast. Readability, not decoration.
-	if is_solid():
+	if is_solid() and type != Tuning.PlatformType.SOLID:
 		draw_rect(Rect2(-w, -h, w * 2.0, 3.0),
 			Color(1, 1, 1, (0.55 + _flash * 0.45) * alpha), true)
 
@@ -183,6 +195,10 @@ func _colour() -> Color:
 			col = Color(1.0, 0.38, 0.42)
 		Tuning.PlatformType.PHASING:
 			col = Color(0.72, 0.45, 1.0)
+		Tuning.PlatformType.SOLID:
+			# Pale steel, deliberately unlike the neon types: it is scenery you
+			# must respect rather than a surface you can pass through.
+			col = Color(0.88, 0.93, 1.0)
 		_:
 			col = Color.from_hsv(fposmod(0.52 + hue_offset, 1.0), 0.55, 1.0)
 

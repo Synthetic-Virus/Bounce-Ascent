@@ -139,12 +139,35 @@ enum PlatformType {
 	MOVING,     ## sways horizontally, in time with the music
 	CRUMBLING,  ## collapses once you leave it, so it cannot rescue a fall
 	PHASING,    ## solid for one bar, intangible the next
+	SOLID,      ## blocks from every side; must be climbed around, not through
 }
 
 ## Tier at which each type starts appearing.
 const UNLOCK_MOVING: int = 12
 const UNLOCK_CRUMBLING: int = 30
 const UNLOCK_PHASING: int = 55
+
+## SOLID blocks are the late-game shift, so they arrive last and then take over.
+##
+## Every other platform is ONE-WAY: the player passes up through it and lands on
+## the way down. A solid block cannot be entered at all, and since the player
+## always approaches from the tier below, it cannot be landed on by jumping at
+## it. The move is to rise BESIDE it and slide over the top, which is why it
+## belongs to the higher levels.
+const UNLOCK_SOLID: int = 80
+
+## Share of platforms that are SOLID, at unlock and at full difficulty. Above
+## 0.5 it is the primary type, which is the requested late-game character.
+const SOLID_SHARE_START: float = 0.12
+const SOLID_SHARE_MAX: float = 0.68
+
+## Minimum horizontal offset between a solid block and the platform below it.
+##
+## Load-bearing for fairness. If a solid block sat directly above the player's
+## launch point they would rise into its underside with no way past. This forces
+## enough clearance that the ascent passes beside it and the player can move
+## over the top. One platform half-width plus the player's diameter.
+const SOLID_MIN_OFFSET: float = PLATFORM_HALF_WIDTH + 56.0
 
 ## Chance of a special (non-NORMAL) platform, just after everything has
 ## unlocked and at full difficulty. Capped well below 1.0: a climb of nothing

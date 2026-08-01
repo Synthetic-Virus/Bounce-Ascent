@@ -228,6 +228,26 @@ func test_platform_type_unlocks() -> void:
 	check(Tuning.UNLOCK_PHASING < Tuning.RAMP_TIERS,
 		"every type unlocks before the difficulty ramp maxes out")
 
+	# SOLID arrives last and then takes over, which is the requested late-game
+	# character: above a 0.5 share it is the PRIMARY type rather than a hazard.
+	check(Tuning.UNLOCK_SOLID > Tuning.UNLOCK_PHASING,
+		"SOLID unlocks after every other type")
+	check(Tuning.SOLID_SHARE_MAX > 0.5,
+		"SOLID becomes the primary type high up (%.2f)" % Tuning.SOLID_SHARE_MAX)
+	check(Tuning.SOLID_SHARE_START < Tuning.SOLID_SHARE_MAX,
+		"SOLID grows more common with height")
+
+	# The clearance rule is what keeps solid blocks fair rather than merely
+	# hard: a solid block directly above the launch point would be a wall with
+	# no way past, since it cannot be entered from below.
+	check(Tuning.SOLID_MIN_OFFSET > Tuning.PLATFORM_HALF_WIDTH,
+		"solid blocks are forced clear of the launch point (%.0fpx > %.0fpx)"
+			% [Tuning.SOLID_MIN_OFFSET, Tuning.PLATFORM_HALF_WIDTH])
+	# It must still be reachable: wrapping caps the worst case at half the
+	# playfield, and one hop covers far more than that.
+	check(Tuning.SOLID_MIN_OFFSET < Tuning.PLAYFIELD_WIDTH * 0.5,
+		"the forced offset stays inside one hop of travel")
+
 
 # --- The central claim: no timing drift -------------------------------------
 

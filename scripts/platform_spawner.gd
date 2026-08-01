@@ -81,25 +81,34 @@ func _spawn_next() -> void:
 	var progress := clampf(float(tier) / Tuning.RAMP_TIERS, 0.0, 1.0)
 	var spread := lerpf(Tuning.SPREAD_START, Tuning.SPREAD_MAX, progress)
 
+	var type := _pick_type(tier)
+
 	var max_offset := spread * Tuning.PLAYFIELD_WIDTH
 	var offset := _rng.randf_range(-max_offset, max_offset)
 
 	# Bias away from tiny offsets: a near-zero drift means the player need not
 	# move at all, which is dead air mid-climb.
-	if absf(offset) < Tuning.PLATFORM_HALF_WIDTH:
-		offset = Tuning.PLATFORM_HALF_WIDTH * signf(offset if offset != 0.0 else 1.0)
+	var floor_offset := Tuning.PLATFORM_HALF_WIDTH
+	if type == Tuning.PlatformType.SOLID:
+		# A solid block cannot be entered from below, so one sitting directly
+		# above the player's launch point would be a wall with no way past. This
+		# guarantees the ascent passes BESIDE it, leaving room to move over the
+		# top and drop on. Without it, solid blocks would be unfair, not hard.
+		floor_offset = Tuning.SOLID_MIN_OFFSET
+	if absf(offset) < floor_offset:
+		offset = floor_offset * signf(offset if offset != 0.0 else 1.0)
 
 	# Wrap rather than clamp, or platforms would pile against the edges once the
 	# spread grew large.
-	_spawn_tier(tier, fposmod(_last_x + offset, Tuning.PLAYFIELD_WIDTH))
+	_spawn_tier(tier, fposmod(_last_x + offset, Tuning.PLAYFIELD_WIDTH), type)
 
 
-func _spawn_tier(tier: int, x: float) -> void:
+func _spawn_tier(tier: int, x: float,
+		type: Tuning.PlatformType = Tuning.PlatformType.NORMAL) -> void:
 	var p := _acquire()
 	# Platforms narrow with altitude, tightening landing precision without
 	# touching the beat cadence.
 	var progress := clampf(float(tier) / Tuning.RAMP_TIERS, 0.0, 1.0)
-	var type := _pick_type(tier)
 	var amplitude := 0.0
 	if type == Tuning.PlatformType.MOVING:
 		amplitude = lerpf(Tuning.MOVE_AMPLITUDE_START,
@@ -121,9 +130,29 @@ func _spawn_tier(tier: int, x: float) -> void:
 ##   * two special platforms never appear back to back, because consecutive
 ##     hazards can demand a route the player cannot reach in one hop.
 func _pick_type(tier: int) -> Tuning.PlatformType:
-	if tier <= 1 or _last_was_special:
+	# A run never opens on anything but plain platforms.
+	if tier <= 1:
 		_last_was_special = false
 		return Tuning.PlatformType.NORMAL
+
+	# SOLID is drawn first and on its own ramp, because it is meant to become
+	# the PRIMARY type high up rather than one hazard among several. Above
+	# SOLID_SHARE 0.5 it is the majority of what the player sees.
+	if tier >= Tuning.UNLOCK_SOLID:
+		var solid_progress := clampf(
+			float(tier - Tuning.UNLOCK_SOLID)
+				/ maxf(Tuning.RAMP_TIERS - float(Tuning.UNLOCK_SOLID), 1.0),
+			0.0, 1.0)
+		var solid_share := lerpf(
+			Tuning.SOLID_SHARE_START, Tuning.SOLID_SHARE_MAX, solid_progress)
+		if _rng.randf() < solid_share:
+			# Deliberately NOT gated by _last_was_special. That rule exists to
+			# stop hazards stacking, but SOLID is meant to become the PRIMARY
+			# type up here, and throttling it to every other tier capped it at
+			# about 22% instead of the intended majority. The forced horizontal
+			# clearance below is what keeps consecutive blocks navigable.
+			_last_was_special = false
+			return Tuning.PlatformType.SOLID
 
 	var available: Array[Tuning.PlatformType] = []
 	if tier >= Tuning.UNLOCK_MOVING:

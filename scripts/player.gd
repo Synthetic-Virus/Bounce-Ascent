@@ -13,6 +13,11 @@ extends CharacterBody2D
 
 signal jumped(judgement: int, error: float, tiers: int)
 signal landed(platform: Node2D)
+
+## Emitted when an upward arc is stopped by a solid block. The hop is ruined:
+## the player will now fall early and off the beat, so listeners that measure
+## timing should discard the landing that follows.
+signal bonked
 signal died
 
 const RADIUS: float = 22.0
@@ -122,6 +127,16 @@ func _physics_process(delta: float) -> void:
 	var was_grounded := _grounded
 	move_and_slide()
 	_grounded = is_on_floor()
+
+	# Hitting the underside of a solid block. Kill the remaining upward speed
+	# rather than letting the body scrape along it, so the fall starts cleanly.
+	if is_on_ceiling() and velocity.y < 0.0:
+		velocity.y = 0.0
+		_deform = Tuning.BLOB_LAND_SQUASH * 0.6
+		_deform_vel = 0.0
+		_flash = 1.0
+		_flash_color = Tuning.judgement_color(Tuning.Judgement.MISS)
+		bonked.emit()
 
 	if _grounded and not was_grounded:
 		_on_land()
