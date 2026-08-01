@@ -69,8 +69,12 @@ because it waits for audio synthesis rather than erroring.
 | `A` `D` / `LEFT` `RIGHT` | steer horizontally (in the air only) |
 | `ESC` | pause / back |
 | `R` | restart |
-| `C` (menu) | audio calibration |
-| `F` / `K` (menu) | toggle flash effects / screen shake |
+| on-screen `II` | pause (touch has no ESC key) |
+
+On a phone: **tilt to steer, tap anywhere to jump**. The jump gets the whole
+screen as its target, which matters for an input judged to +/-45 ms. Settings
+offers on-screen steer pads instead, for playing with the device flat. Settings,
+calibration and the pause menu are all real buttons, not keyboard hints.
 
 Steering is deliberately disabled while you are standing on a platform. Holding
 a direction to line up your next platform is the natural thing to do, and if
@@ -113,12 +117,20 @@ you have to read it while airborne.
 | Moving | amber | 12 | sways horizontally, one full cycle per bar |
 | Crumbling | red | 30 | collapses shortly after you leave, so it cannot catch you on the way back down |
 | Phasing | violet | 55 | solid for one bar, intangible the next; it fades out so you can see the change coming |
+| Solid | steel | 80 | **cannot be passed through at all** |
 
-Two fairness rules: tiers 0 and 1 are always plain, and two special platforms
-never spawn back to back, since consecutive hazards can demand a route that is
-not reachable in one hop. Plain platforms stay the majority at every height
-(capped at 62% special), because a climb of nothing but hazards stops reading as
-a rhythm game.
+Everything except Solid is one-way: you rise through it and land on the way
+down. A **solid block cannot be entered from below**, and since you always
+approach from the tier beneath, it cannot be jumped at directly. The move is to
+rise *beside* it and slide over the top. That is a harder skill, which is why it
+arrives last and then takes over: it ramps to a 68% share, so the late climb is
+mostly solid blocks (measured at 65% over tiers 200-240) while the early climb
+stays 74% plain.
+
+Fairness rules: tiers 0 and 1 are always plain; the neon hazards never spawn
+back to back; and a solid block is forced at least a platform half-width plus a
+player diameter clear of the platform below it, so the ascent always passes
+beside it rather than into it.
 
 Every type varies horizontal difficulty or availability only. **None of them
 changes a platform's y**, because fixed tier spacing is what makes flight time
