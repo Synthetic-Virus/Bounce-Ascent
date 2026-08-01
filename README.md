@@ -10,6 +10,25 @@ shipped `.exe` remained).
 
 ---
 
+## Play it
+
+Download **`BounceAscent.exe`** from the
+[latest release](../../releases/latest). Windows only for now, single file, no
+installer and no runtime to fetch: the PCK is embedded in the executable.
+
+Windows SmartScreen will warn about it, because the binary is unsigned. *More
+info* then *Run anyway*. Code signing needs a certificate this project does not
+have.
+
+First thing in game: **Settings -> Calibrate audio**. Skipping it is the single
+biggest cause of "my timing feels wrong", for the reason explained under
+[Audio](#audio).
+
+Android and iOS builds exist in CI but are not published here yet. iOS is
+unsigned pending Apple Developer enrolment.
+
+---
+
 ## The one idea everything rests on
 
 In an ordinary jumping game you pick a jump velocity and the flight time falls
@@ -152,11 +171,12 @@ bump `RENDER_VERSION`** or every cached render stays stale forever and your
 change will appear to do nothing. That is the one piece of manual bookkeeping in
 the audio pipeline.
 
-**Calibrate first.** Press `C` on the menu and tap sixteen times to the kick
-drum. Audio latency varies by more than 200 ms between wired headphones and a
-Bluetooth soundbar, far wider than the +/-45 ms PERFECT window, so without
-calibration a player on high-latency output cannot score well no matter how good
-their timing is.
+**Calibrate first.** Open **Settings** on the menu, press **Calibrate audio**,
+and tap sixteen times to the kick drum. Audio latency varies by more than 200 ms
+between wired headphones and a Bluetooth soundbar, far wider than the +/-45 ms
+PERFECT window, so without calibration a player on high-latency output cannot
+score well no matter how good their timing is. The menu says
+`Calibrate audio  <- do this first` until you have.
 
 ---
 
@@ -191,7 +211,14 @@ tests/
   ui_test.gd       widget layout, pause lifecycle, focus loss
   gameplay_test.gd end-to-end: does the assembled game land on beats?
   perf_probe.gd    dev tool: measure synthesis cost
+  song_probe.gd    dev tool: checksum each track's PCM to prove the three
+                   songs are genuinely different audio, not one tempo-shifted
+  results_preview.gd  dev tool: render the results panel with a fixed result,
+                   so it can be screenshotted without playing a run out
 ```
+
+Nothing under `tests/` ships: `export_presets.cfg` excludes the whole directory
+from every platform.
 
 No texture or audio assets, by design. Every visual is drawn in code from Godot
 primitives, which keeps the export tiny and lets everything react to the beat
