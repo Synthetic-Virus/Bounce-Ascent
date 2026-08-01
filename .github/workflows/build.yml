@@ -192,8 +192,10 @@ jobs:
           ~/godot/Godot.app/Contents/MacOS/Godot --headless --import --path . || true
 
       - name: Export Xcode project
-        # UNSIGNED. This produces an Xcode project, not an installable .ipa,
-        # because signing needs a paid Apple Developer Program membership.
+        # UNSIGNED. Produces an Xcode project, not an installable .ipa, because
+        # signing needs a paid Apple Developer Program membership. The preset
+        # sets export_project_only so Godot stops after generating the project
+        # rather than attempting an archive it cannot sign.
         #
         # To turn on signing later, add these repository secrets and set
         # application/app_store_team_id in export_presets.cfg:
