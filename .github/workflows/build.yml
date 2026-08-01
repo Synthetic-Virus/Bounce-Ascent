@@ -191,26 +191,77 @@ jobs:
         run: |
           ~/godot/Godot.app/Contents/MacOS/Godot --headless --import --path . || true
 
-      - name: Export Xcode project
-        # UNSIGNED. Produces an Xcode project, not an installable .ipa, because
-        # signing needs a paid Apple Developer Program membership. The preset
-        # sets export_project_only so Godot stops after generating the project
-        # rather than attempting an archive it cannot sign.
-        #
-        # To turn on signing later, add these repository secrets and set
-        # application/app_store_team_id in export_presets.cfg:
-        #   APPLE_TEAM_ID, APPLE_CERT_P12, APPLE_CERT_PASSWORD,
-        #   APPLE_PROVISIONING_PROFILE
-        # then import the cert into the keychain and run xcodebuild archive.
+      # Signing turns itself on when the secrets exist. Nothing here needs
+      # editing when the Apple Developer enrolment completes: add the four
+      # repository secrets and the next run produces a signed .ipa instead of
+      # a bare Xcode project. See docs/IOS_SIGNING.md.
+      - name: Detect signing secrets
+        id: signing
+        env:
+          CERT: ${{ secrets.APPLE_CERT_P12 }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CERT" ] && [ -n "$TEAM" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets present: producing a signed build."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No signing secrets: producing an unsigned Xcode project."
+          fi
+
+      - name: Install certificate and provisioning profile
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          # A dedicated, throwaway keychain: never touch the runner default.
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROFILE" | base64 --decode \
+            > "$HOME/Library/MobileDevice/Provisioning Profiles/build.mobileprovision"
+
+      - name: Apply the real Team ID
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          # The preset ships a placeholder so the unsigned export validates.
+          sed -i '' "s/application\/app_store_team_id=\".*\"/application\/app_store_team_id=\"$TEAM\"/" export_presets.cfg
+          sed -i '' 's/application\/export_project_only=true/application\/export_project_only=false/' export_presets.cfg
+          grep -E "app_store_team_id|export_project_only" export_presets.cfg
+
+      - name: Import project
+        run: |
+          ~/godot/Godot.app/Contents/MacOS/Godot --headless --import --path . || true
+
+      - name: Export
+        # Unsigned: emits an Xcode project and stops, because archiving needs a
+        # signing identity. Signed: archives through to an installable .ipa.
         run: |
           set -euo pipefail
           mkdir -p build/ios
           ~/godot/Godot.app/Contents/MacOS/Godot --headless --path . \
             --export-release "iOS" build/ios/BounceAscent.xcodeproj
-          ls -la build/ios
+          ls -laR build/ios | head -40
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-xcodeproj-unsigned
+          name: ios-${{ steps.signing.outputs.enabled == 'true' && 'signed-ipa' || 'xcodeproj-unsigned' }}
           path: build/ios
           retention-days: 30

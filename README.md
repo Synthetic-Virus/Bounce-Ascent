@@ -219,6 +219,15 @@ timeout 400 "$GODOT" --headless --path "$PROJ" \
 `export_presets.cfg` is checked in deliberately. It embeds the PCK into a single
 `.exe` and excludes `tests/` and `docs/` from the shipped build.
 
+CI builds Windows, Android and iOS on every push to `main`. Export templates are
+cached by Godot version, so a run takes about two minutes once warm. Windows and
+Android build free on Linux; the iOS job runs on macOS, which bills at 10x, so
+it is independent and `continue-on-error` and never blocks the other two.
+
+iOS currently produces an **unsigned Xcode project**. It switches to a signed
+`.ipa` on its own once four repository secrets exist, with no code change
+required. See [docs/IOS_SIGNING.md](docs/IOS_SIGNING.md).
+
 > **Always wrap headless Godot in `timeout`.** If a script fails to parse, Godot
 > does not exit. It sits idle forever with the failed scene. During development
 > this looked exactly like "synthesis is slow" and burned a nine minute run
