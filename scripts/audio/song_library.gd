@@ -18,7 +18,11 @@ const A2: int = 45
 const A3: int = 57
 const A4: int = 69
 
+## Melody scales. Pentatonic is safe over any minor chord; Phrygian adds the
+## flat second, which is what makes a line sound menacing rather than merely
+## fast. Giving tracks different scales separates them far more than tempo does.
 const MINOR_PENTATONIC: Array[int] = [0, 3, 5, 7, 10]
+const PHRYGIAN: Array[int] = [0, 1, 3, 5, 7, 8, 10]
 
 # --- Instruments ------------------------------------------------------------
 
@@ -54,6 +58,11 @@ const INST_BASS_REEDY: Dictionary = {
 const INST_ARP: Dictionary = {
 	"wave": Synth.WAVE_PULSE, "pulse_width": 0.25,
 	"attack": 0.002, "decay": 0.06, "sustain": 0.35, "release": 0.05,
+}
+
+const INST_ARP_GLASS: Dictionary = {
+	"wave": Synth.WAVE_TRIANGLE,
+	"attack": 0.001, "decay": 0.10, "sustain": 0.15, "release": 0.09,
 }
 
 const INST_LEAD_SOFT: Dictionary = {
@@ -100,6 +109,8 @@ static func all_songs() -> Array[Dictionary]:
 			"bass": "eighths", "bass_inst": INST_BASS_ROUND,
 			"lead_inst": INST_LEAD_SOFT, "lead_octave": 0,
 			"arp": false, "pad": true,
+			"root": 0, "scale": MINOR_PENTATONIC,
+			"arp_div": 0.25, "arp_inst": INST_ARP, "arp_octave": 0,
 			"motif": [0, 3, 5, 3, 7, 5, 3, 0],
 			"lead_gain": 0.30, "rest_phrase": true,
 		}),
@@ -112,6 +123,10 @@ static func all_songs() -> Array[Dictionary]:
 			"bass": "offbeat", "bass_inst": INST_BASS_REEDY,
 			"lead_inst": INST_LEAD_SHARP, "lead_octave": 0,
 			"arp": true, "pad": true,
+			# Up a fourth, and the arp is a slow glassy triangle in eighths
+			# rather than a busy pulse in sixteenths.
+			"root": 5, "scale": MINOR_PENTATONIC,
+			"arp_div": 0.5, "arp_inst": INST_ARP_GLASS, "arp_octave": 0,
 			"motif": [7, 5, 7, 10, 12, 10, 7, 5],
 			"lead_gain": 0.26, "rest_phrase": true,
 		}),
@@ -124,7 +139,13 @@ static func all_songs() -> Array[Dictionary]:
 			"bass": "driving", "bass_inst": INST_BASS_REEDY,
 			"lead_inst": INST_LEAD_HARD, "lead_octave": 1,
 			"arp": true, "pad": false,
-			"motif": [12, 10, 7, 10, 12, 15, 12, 10],
+			# Down a fourth and in PHRYGIAN, so the flat second colours every
+			# melodic line. Sixteenth pulse arp an octave up, no pad to hide
+			# behind. Shares no key, scale, arp texture or drum pattern with
+			# Vector Drive.
+			"root": -5, "scale": PHRYGIAN,
+			"arp_div": 0.25, "arp_inst": INST_ARP, "arp_octave": 1,
+			"motif": [7, 6, 4, 6, 7, 9, 7, 3],
 			"lead_gain": 0.22, "rest_phrase": false,
 		}),
 	]
@@ -166,7 +187,7 @@ static func _build(style: Dictionary) -> Dictionary:
 		})
 	if style["arp"]:
 		tracks.append({
-			"instrument": INST_ARP, "gain": 0.19, "pan": 0.45,
+			"instrument": style["arp_inst"], "gain": 0.19, "pan": 0.45,
 			"notes": _arp(style, bars, bpb),
 		})
 	tracks.append({
@@ -181,9 +202,11 @@ static func _build(style: Dictionary) -> Dictionary:
 	}
 
 
+## Chord root for a bar, including the song's global transposition. Every part
+## reads through here, so changing "root" moves the whole track to a new key.
 static func _chord(style: Dictionary, bar: int) -> int:
 	var prog: Array = style["progression"]
-	return int(prog[bar % prog.size()])
+	return int(prog[bar % prog.size()]) + int(style.get("root", 0))
 
 
 static func _shape(style: Dictionary, bar: int) -> Array:
@@ -280,16 +303,19 @@ static func _pad(style: Dictionary, bars: int, bpb: int) -> Array:
 
 static func _arp(style: Dictionary, bars: int, bpb: int) -> Array:
 	var notes: Array = []
+	var div: float = style.get("arp_div", 0.25)
+	var oct: int = int(style.get("arp_octave", 0))
+	var steps_per_bar := int(float(bpb) / div)
 	for bar in bars:
 		if bar < 2:
 			continue
-		var root := A4 + _chord(style, bar)
+		var root := A4 + _chord(style, bar) + oct * 12
 		var shape := _shape(style, bar)
-		for step in bpb * 4:
+		for step in steps_per_bar:
 			var degree := step % shape.size()
 			var octave_up := int(step / shape.size()) % 2
 			notes.append([
-				float(bar * bpb) + float(step) * 0.25, 0.22,
+				float(bar * bpb) + float(step) * div, div * 0.85,
 				root + int(shape[degree]) + octave_up * 12, 0.75,
 			])
 	return notes
@@ -314,15 +340,18 @@ static func _lead(style: Dictionary, bars: int, bpb: int) -> Array:
 			var index := (bar * bpb + step) % motif.size()
 			notes.append([
 				float(bar * bpb + step), 0.9,
-				root + _pentatonic(int(motif[index])), 0.85,
+				root + _degree(style, int(motif[index])), 0.85,
 			])
 	return notes
 
 
-static func _pentatonic(degree: int) -> int:
-	var size := MINOR_PENTATONIC.size()
+## Convert a motif degree into a semitone offset within the song's own scale,
+## wrapping into higher octaves past the end.
+static func _degree(style: Dictionary, degree: int) -> int:
+	var scale: Array = style.get("scale", MINOR_PENTATONIC)
+	var size := scale.size()
 	var octave := int(floor(float(degree) / float(size)))
 	var index := degree % size
 	if index < 0:
 		index += size
-	return MINOR_PENTATONIC[index] + octave * 12
+	return int(scale[index]) + octave * 12

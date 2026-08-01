@@ -172,7 +172,70 @@ func _run() -> void:
 	await get_tree().process_frame
 
 	await _test_fail_condition()
+	await _test_restart_after_death()
 	await _test_platform_type_progression()
+
+
+## Restarting after a death must produce a playable run, not an instant death.
+##
+## Reported symptom: the first "climb again" after falling died immediately,
+## and only the second attempt played. Anything the run carries over from the
+## previous one is a candidate, so this asserts the fresh run survives well past
+## the count-in.
+func _test_restart_after_death() -> void:
+	print("- restarting after a death gives a playable run")
+	var game: Node2D = await _start_game()
+	var player: CharacterBody2D = game.get_node("Player")
+	var camera: Camera2D = game.get_node("GameCamera")
+
+	# Play far enough up that the death line has climbed well away from the
+	# start height. That gap is what makes stale carry-over state fatal.
+	var waited := 0.0
+	while game.state != game.State.PLAYING and waited < 15.0:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+
+	var climbed := 0.0
+	while climbed < 8.0 and game.state == game.State.PLAYING:
+		_steer_toward_next_platform(player, game.get_node("PlatformSpawner"))
+		await get_tree().process_frame
+		climbed += get_process_delta_time()
+	_release_steering()
+
+	var death_line_when_high: float = camera.death_line_y()
+	print("    climbed to tier %d, death line at y=%.0f"
+		% [player.current_tier, death_line_when_high])
+
+	# Kill the run deliberately.
+	player.global_position = Vector2(
+		Tuning.PLAYFIELD_WIDTH * 0.5, camera.death_line_y() + Tuning.TIER_RISE)
+	var dying := 0.0
+	while game.state != game.State.DEAD and dying < 4.0:
+		await get_tree().process_frame
+		dying += get_process_delta_time()
+	check(game.state == game.State.DEAD, "run ended so a restart can be tested")
+
+	# Restart exactly as the results screen does.
+	game._on_restart_requested()
+	await get_tree().process_frame
+
+	# Survive the count-in plus a couple of hops.
+	var alive := 0.0
+	var died_at := -1.0
+	while alive < 6.0:
+		await get_tree().process_frame
+		alive += get_process_delta_time()
+		if game.state == game.State.DEAD:
+			died_at = alive
+			break
+
+	check(died_at < 0.0,
+		"restarted run is still alive after 6s (died at %.2fs)" % died_at)
+	print("    restarted run reached tier %d, state %d"
+		% [player.current_tier, game.state])
+
+	game.queue_free()
+	await get_tree().process_frame
 
 
 ## Falling off the screen must end the run.

@@ -67,6 +67,11 @@ func reset(start_position: Vector2) -> void:
 	global_position = start_position
 	velocity = Vector2.ZERO
 	current_tier = 0
+	# MUST be cleared. death_y is only refreshed by Game while the run is
+	# PLAYING, so without this a restart inherits the PREVIOUS run's death line,
+	# which after any real climb sits far above the fresh spawn point. The first
+	# physics tick after the count-in then kills the player instantly.
+	death_y = INF
 	_press_time = -1.0
 	_grounded = false
 	_left_ground_at = -999.0

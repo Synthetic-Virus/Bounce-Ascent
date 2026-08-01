@@ -20,7 +20,7 @@ extends RefCounted
 ## SongCache keys on a hash of the song DEFINITION, which cannot see changes to
 ## the code in this file. Without bumping this, edit an envelope here and every
 ## cached render stays stale forever while the change appears to do nothing.
-const RENDER_VERSION: int = 3
+const RENDER_VERSION: int = 4
 
 ## Output sample rate. 22050Hz is the classic chiptune range: high enough that
 ## the lead and hats stay crisp, low enough to halve both synthesis time and

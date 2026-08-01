@@ -105,6 +105,11 @@ func start_run() -> void:
 	_player.reset(START_POSITION - Vector2(
 		0.0, Tuning.PLATFORM_HALF_HEIGHT + _player.RADIUS + 2.0))
 	_camera.reset(_player.global_position.y)
+	# Seed the player's copy immediately rather than waiting for the first
+	# _process_playing tick. Physics runs at 120Hz and can fire between the
+	# count-in ending and the next _process, so "it will be set shortly" is not
+	# good enough for a value that decides whether the player is alive.
+	_player.death_y = _camera.death_line_y()
 
 	# Freeze the player through the count-in.
 	_player.active = false
