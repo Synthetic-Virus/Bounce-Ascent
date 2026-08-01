@@ -1,9 +1,47 @@
 # Turning on iOS signing
 
-CI already builds iOS. Without signing secrets it produces an **unsigned Xcode
-project**; with them it produces a **signed `.ipa`**. The workflow detects which
-case it is on its own, so **no code changes are needed** when your Apple
-Developer enrolment completes. Add four repository secrets and push.
+CI already builds iOS. Without signing secrets it produces an **unsigned `.ipa`
+plus the Xcode project**; with them it produces a **signed `.ipa`**. The
+workflow detects which case it is on its own, so **no code changes are needed**
+when your Apple Developer enrolment completes. Add four repository secrets and
+push.
+
+---
+
+## Before enrolment: sideloading the unsigned build
+
+You do not have to wait for the paid enrolment to get the game onto your own
+iPhone, and you do not need a Mac.
+
+CI produces an artifact called **`ios-unsigned-ipa`** on every run. Download it
+from the Actions tab, or:
+
+```bash
+gh run download -R Synthetic-Virus/Bounce-Ascent -n ios-unsigned-ipa
+```
+
+That `.ipa` contains a real compiled app but carries no signature, so iOS will
+not install it as-is. **Sideloadly** or **AltStore** solve that: both run on
+Windows, re-sign the `.ipa` with an ordinary Apple ID, and install it to a
+device over USB. You will also need Apple Devices (or iTunes) installed so
+Windows can talk to the phone.
+
+The limits of a free Apple ID:
+
+- the app **stops launching after 7 days** and must be re-signed
+- at most **3** sideloaded apps on the device at once
+- no distribution to anyone else, it is your device only
+
+A **paid** account raises the 7 days to a year, which is the main day-to-day
+difference you will notice after enrolling. For handing builds to other people
+you still want TestFlight, covered at the end of this document.
+
+How the unsigned build is produced, since it is not obvious: Godot stops at the
+Xcode project when it has no signing identity, so the workflow runs `xcodebuild`
+itself with `CODE_SIGNING_ALLOWED=NO`, then packages the resulting `.app` into
+`Payload/` and zips it. That works because signing is applied to the compiled
+app rather than being part of compilation, and because an `.ipa` is only a zip
+with a directory named `Payload` in it.
 
 ---
 

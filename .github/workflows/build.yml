@@ -5,10 +5,14 @@ name: Build
 # BUILD TIME
 # ----------
 # The slow part is the 800MB export-template download, so it is cached by Godot
-# version and only re-fetched when that changes. Windows and Android both build
-# on free Linux runners; only iOS needs macOS, which bills at 10x the minute
-# rate, so it runs LAST and independently. A failure there never blocks the two
-# cheap builds.
+# version and only re-fetched when that changes. Windows and Android build on
+# Linux; iOS needs macOS. The repository is PUBLIC, so all standard GitHub
+# runners are free here, macOS included, and the iOS job is not held back for
+# cost reasons. It stays independent and continue-on-error only so a broken
+# Apple toolchain never blocks a perfectly good Windows and Android build.
+#
+# (If this repo is ever made private, that changes: macOS then bills at 10x the
+# Linux minute rate and this job becomes the expensive one.)
 #
 # The project is pure GDScript with no addons and no imported assets, so the
 # export itself takes seconds. Tests are not run here by design.
@@ -156,9 +160,9 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iOS (unsigned)
-    # macOS runners bill at 10x, so this is deliberately independent of the
-    # cheap builds and does not gate them.
+    name: iOS
+    # Independent of the other two so an Apple toolchain problem cannot block
+    # them. Free on this public repo, see the note at the top of the file.
     runs-on: macos-latest
     continue-on-error: true
     steps:
@@ -260,8 +264,75 @@ jobs:
             --export-release "iOS" build/ios/BounceAscent.xcodeproj
           ls -laR build/ios | head -40
 
+      # Build an INSTALLABLE .ipa even with no Apple account.
+      #
+      # Godot stops at the Xcode project when unsigned, and an Xcode project is
+      # useless without a Mac. But signing is applied to the compiled app, not
+      # baked into compilation, so Xcode will happily build the binary with
+      # signing switched off entirely. An .ipa is then just a zip containing
+      # Payload/<App>.app, which we assemble by hand: -exportArchive exists
+      # mainly to SIGN, and we have nothing to sign with.
+      #
+      # The result installs via Sideloadly or AltStore, which re-sign it on the
+      # user's own machine with an ordinary Apple ID. With a free account that
+      # lasts 7 days; with a paid one, a year.
+      #
+      # CODE_SIGN_ENTITLEMENTS is cleared as well as the identity. Godot emits
+      # an entitlements file, and entitlements are meaningless to an unsigned
+      # binary: leaving it set makes some Xcode versions demand a signing
+      # identity for a build that was explicitly told not to sign.
+      - name: Package an unsigned .ipa
+        if: steps.signing.outputs.enabled != 'true'
+        working-directory: build/ios
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project BounceAscent.xcodeproj \
+            -scheme BounceAscent \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build
+
+          APP="$(find dd/Build/Products -maxdepth 2 -name '*.app' -print -quit)"
+          if [ -z "$APP" ]; then
+            echo "No .app was produced; the build succeeded but emitted nothing."
+            find dd/Build/Products -maxdepth 3 || true
+            exit 1
+          fi
+          echo "Packaging $APP"
+
+          # An .ipa is a zip whose payload lives in a directory literally named
+          # Payload. The name is not a convention, it is load-bearing.
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry BounceAscent-unsigned.ipa Payload
+          test -s BounceAscent-unsigned.ipa
+          ls -la BounceAscent-unsigned.ipa
+
+      - name: Upload the unsigned .ipa
+        if: steps.signing.outputs.enabled != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: build/ios/BounceAscent-unsigned.ipa
+          retention-days: 30
+
+      # The Xcode project is uploaded regardless. It is the thing to open on a
+      # Mac, and it is also the fallback if the unsigned packaging above ever
+      # breaks. Artifact storage is free on a public repo.
       - uses: actions/upload-artifact@v4
         with:
           name: ios-${{ steps.signing.outputs.enabled == 'true' && 'signed-ipa' || 'xcodeproj-unsigned' }}
-          path: build/ios
+          path: |
+            build/ios
+            !build/ios/dd
+            !build/ios/Payload
           retention-days: 30
