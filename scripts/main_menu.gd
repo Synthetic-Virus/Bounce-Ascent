@@ -19,6 +19,8 @@ var _preview_started: bool = false
 
 var _main_panel: VBoxContainer
 var _settings_panel: VBoxContainer
+var _howto_panel: VBoxContainer
+var _howto: Button
 var _track_buttons: Array[Button] = []
 var _play: Button
 var _volume: HSlider
@@ -67,6 +69,11 @@ func _build() -> void:
 	add_child(_settings_panel)
 	_build_settings(_settings_panel)
 
+	_howto_panel = _make_column()
+	_howto_panel.visible = false
+	add_child(_howto_panel)
+	_build_howto(_howto_panel)
+
 
 ## A full-height column inside the safe area, so nothing lands under a notch or
 ## a home indicator on a phone.
@@ -110,6 +117,14 @@ func _build_main(col: VBoxContainer) -> void:
 	_play.custom_minimum_size = Vector2(0, Tuning.TOUCH_PRIMARY)
 	_play.pressed.connect(_start_game)
 	col.add_child(_play)
+
+	# Above Settings, because a new player needs this and does not need Settings.
+	# Its label calls itself out until the player has actually finished a run;
+	# see _refresh().
+	_howto = UIKit.button("", UIKit.CYAN, 20)
+	_howto.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	_howto.pressed.connect(_show_howto)
+	col.add_child(_howto)
 
 	var settings := UIKit.button("Settings", UIKit.CYAN, 20)
 	settings.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
@@ -178,6 +193,55 @@ func _build_settings(col: VBoxContainer) -> void:
 	col.add_child(back)
 
 
+## How to play.
+##
+## Written as four things in the order a player needs them, not as a feature
+## list. The game's central rule is not guessable by experiment: you can play
+## for a long time, jump whenever, and never notice that timing is what decides
+## how high you go. That has to be stated.
+##
+## Controls adapt to the device, because telling a phone player about the A key
+## is noise and telling a desktop player to tap is worse.
+func _build_howto(col: VBoxContainer) -> void:
+	col.add_child(UIKit.heading("How to play", 46, UIKit.CYAN, 3))
+	col.add_child(_spacer(8))
+
+	col.add_child(UIKit.eyebrow("The rule"))
+	col.add_child(UIKit.data("You jump on every beat.", 20, UIKit.TEXT))
+	col.add_child(UIKit.data("Land, then tap in time with the music.", 18, UIKit.DIM))
+
+	col.add_child(_spacer(12))
+	col.add_child(UIKit.eyebrow("Timing is height"))
+	col.add_child(UIKit.data("Perfect timing climbs TWO platforms.", 19, UIKit.GOLD))
+	col.add_child(UIKit.data("Anything else climbs one.", 18, UIKit.DIM))
+
+	col.add_child(_spacer(12))
+	col.add_child(UIKit.eyebrow("Stay ahead"))
+	col.add_child(UIKit.data("A hazard line rises from below and", 18, UIKit.DIM))
+	col.add_child(UIKit.data("speeds up. Fall behind it and the run ends.", 18, UIKit.DIM))
+
+	col.add_child(_spacer(12))
+	col.add_child(UIKit.eyebrow("Controls"))
+	if DisplayServer.is_touchscreen_available():
+		col.add_child(UIKit.data("Tap anywhere to jump.", 19, UIKit.TEXT))
+		col.add_child(UIKit.data("Hold the arrows to steer, in the air only.", 18, UIKit.DIM))
+	else:
+		col.add_child(UIKit.data("SPACE to jump.", 19, UIKit.TEXT))
+		col.add_child(UIKit.data("A and D steer, in the air only.", 18, UIKit.DIM))
+	col.add_child(UIKit.data("Standing still, steering is off on purpose,", 17, UIKit.DIM))
+	col.add_child(UIKit.data("so you cannot walk off your own platform.", 17, UIKit.DIM))
+
+	col.add_child(_spacer(12))
+	col.add_child(UIKit.data("Calibrate audio in Settings first, or", 17, UIKit.VIOLET))
+	col.add_child(UIKit.data("good timing will still score badly.", 17, UIKit.VIOLET))
+
+	col.add_child(_spacer(16))
+	var back := UIKit.button("Got it", UIKit.GOLD, 26, true)
+	back.custom_minimum_size = Vector2(0, Tuning.TOUCH_PRIMARY)
+	back.pressed.connect(_hide_howto)
+	col.add_child(back)
+
+
 func _spacer(height: int) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(0, height)
@@ -206,6 +270,19 @@ func _show_settings() -> void:
 func _hide_settings() -> void:
 	Music.play_sfx("ui_move")
 	_settings_panel.visible = false
+	_main_panel.visible = true
+	_play.grab_focus()
+
+
+func _show_howto() -> void:
+	Music.play_sfx("ui_confirm")
+	_main_panel.visible = false
+	_howto_panel.visible = true
+
+
+func _hide_howto() -> void:
+	Music.play_sfx("ui_move")
+	_howto_panel.visible = false
 	_main_panel.visible = true
 	_play.grab_focus()
 
@@ -265,10 +342,12 @@ func _toggle_steering() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("pause"):
 		return
-	# Back out of settings rather than quitting, so the key means the same thing
-	# it means everywhere else in the game.
+	# Back out of a sub-panel rather than quitting, so the key means the same
+	# thing it means everywhere else in the game.
 	if _settings_panel.visible:
 		_hide_settings()
+	elif _howto_panel.visible:
+		_hide_howto()
 	else:
 		get_tree().quit()
 
@@ -301,6 +380,18 @@ func _refresh() -> void:
 		]
 		_track_buttons[i].add_theme_color_override("font_color",
 			UIKit.GOLD if i == _selected else UIKit.TEXT)
+
+	# Calls itself out until the player has a record on some track. The rule that
+	# timing decides height is not discoverable by playing, so a brand new player
+	# who walks past this button never learns the game.
+	var played := false
+	for song in _songs:
+		if Scores.best_score(song["id"]) > 0:
+			played = true
+			break
+	_howto.text = "How to play" if played else "How to play  <- new here?"
+	_howto.add_theme_color_override("font_color",
+		UIKit.CYAN if played else UIKit.GOLD)
 
 	_flash.text = "Flash effects   %s" % ("on" if Settings.flash_effects else "off")
 	_shake.text = "Screen shake    %s" % ("on" if Settings.screen_shake else "off")

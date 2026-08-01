@@ -18,6 +18,13 @@ const GameScene: PackedScene = preload("res://scenes/Game.tscn")
 const MenuScene: PackedScene = preload("res://scenes/MainMenu.tscn")
 const CalibrationScene: PackedScene = preload("res://scenes/Calibration.tscn")
 
+## preload, NOT load(), because the tests call static functions on it.
+##
+## `var x := load("...")` infers Resource, and Resource has no arrow_head, so
+## the call fails the static type check and the whole script refuses to compile.
+## A preloaded const carries the GDScript type, which permits the static call.
+const TouchControls: GDScript = preload("res://scripts/touch_controls.gd")
+
 ## Glow padding and outline bleed put a few pixels outside the layout rect.
 const EDGE_TOLERANCE: float = 8.0
 
@@ -32,6 +39,7 @@ func _ready() -> void:
 	await _test_menu_layout()
 	await _test_menu_navigation()
 	await _test_calibration_layout()
+	await _test_touch_controls()
 	await _test_hud_layout()
 	await _test_pause_lifecycle()
 	await _test_focus_loss_pauses()
@@ -267,7 +275,80 @@ func _test_calibration_layout() -> void:
 
 	_assert_on_screen(calib, "Calibration")
 
+	# REGRESSION: the screen said "tap anywhere" and ignored every tap.
+	#
+	# Control defaults to MOUSE_FILTER_STOP, which consumes pointer events before
+	# _unhandled_input can see them. The keyboard path was unaffected, so "press
+	# space" worked and the whole screen was dead to touch. It shipped because a
+	# desktop test can press space and cannot tap.
+	check(calib.mouse_filter != Control.MOUSE_FILTER_STOP,
+		"calibration root does not swallow taps before _unhandled_input")
+
 	calib.queue_free()
+	await get_tree().process_frame
+
+
+## Touch steering. Both of these shipped broken and neither was visible to any
+## existing assertion, because one lived inside a _draw call and the other only
+## appeared when a finger moved between press and release.
+func _test_touch_controls() -> void:
+	print("- touch steering")
+
+	# REGRESSION: both pads were labelled with the opposite arrow.
+	#
+	# The apex was placed at -w * direction, so the left pad pointed right. The
+	# pads themselves always worked, which is what made it so odd to play: the
+	# controls were correct and the labels lied.
+	var pad := Rect2(0.0, 0.0, 120.0, 120.0)
+	var left_head: PackedVector2Array = TouchControls.arrow_head(pad, -1.0)
+	var right_head: PackedVector2Array = TouchControls.arrow_head(pad, 1.0)
+	check(left_head[0].x < pad.get_center().x,
+		"left pad arrow points left")
+	check(right_head[0].x > pad.get_center().x,
+		"right pad arrow points right")
+
+	# The shaft must sit BEHIND the tip, or the arrow reads as a diamond.
+	var left_shaft: Rect2 = TouchControls.arrow_shaft(pad, -1.0)
+	check(left_shaft.get_center().x > left_head[0].x,
+		"left pad arrow shaft trails behind its tip")
+
+	# REGRESSION: pads stuck down.
+	#
+	# Release was matched by POSITION, so pressing inside a pad and lifting after
+	# sliding off it discarded the release and left the pad held forever. Sliding
+	# off a button is ordinary on a touch screen, so this happened constantly.
+	var tc: Node = TouchControls.new()
+	add_child(tc)
+	await get_tree().process_frame
+	tc._active = true
+	Settings.tilt_steering = false
+
+	# Annotated, not inferred: tc is typed Node, so its methods return Variant
+	# and := has nothing to infer from.
+	var inside: Vector2 = tc._pad_rect_left().get_center()
+	var press := InputEventScreenTouch.new()
+	press.index = 0
+	press.pressed = true
+	press.position = inside
+	tc._unhandled_input(press)
+	check(tc._pad_left, "pad holds while pressed")
+
+	# Lift the SAME finger somewhere else entirely, as a thumb sliding off does.
+	var release := InputEventScreenTouch.new()
+	release.index = 0
+	release.pressed = false
+	release.position = inside + Vector2(400.0, -300.0)
+	tc._unhandled_input(release)
+	check(not tc._pad_left, "pad releases when the finger lifts off the pad")
+	check(not Input.is_action_pressed("move_left"),
+		"steering action is not left pressed after the finger lifts")
+
+	# Losing focus mid-hold must not leave the player steering into a wall.
+	tc._unhandled_input(press)
+	tc._release_all()
+	check(not tc._pad_left, "losing focus mid-hold releases the pad")
+
+	tc.queue_free()
 	await get_tree().process_frame
 
 
@@ -290,6 +371,18 @@ func _test_hud_layout() -> void:
 	ui.on_judged(Tuning.Judgement.MISS, 0.18, 0, 1)
 	await get_tree().process_frame
 	check(true, "HUD drew countdown, perfect and miss states without error")
+
+	# REGRESSION: the pause button was drawn on top of the height readout.
+	#
+	# Both were positioned against the right edge of the screen independently,
+	# with nothing relating them, and they overlapped by 52px. Invisible to every
+	# existing assertion because draw_string leaves no node to measure, which is
+	# why both now expose a rect.
+	var pause_rect: Rect2 = ui.pause_button_rect()
+	var height_rect: Rect2 = ui.height_readout_rect()
+	check(not pause_rect.intersects(height_rect),
+		"pause button does not overlap the height readout")
+	print("    pause %s vs height %s" % [pause_rect, height_rect])
 
 	game.queue_free()
 	await get_tree().process_frame

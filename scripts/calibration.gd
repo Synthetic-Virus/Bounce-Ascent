@@ -51,6 +51,18 @@ func _ready() -> void:
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# MOUSE_FILTER_IGNORE is REQUIRED here, not cosmetic.
+	#
+	# Control defaults to MOUSE_FILTER_STOP, which consumes pointer events before
+	# they reach _unhandled_input. This screen's whole instruction is "tap
+	# anywhere", so a full-rect Control set to STOP silently ate every tap. The
+	# keyboard path was unaffected, which is exactly why this survived desktop
+	# testing: space worked, and nobody could tap a desktop.
+	#
+	# Buttons are children and keep their own filter, so Done and Start over
+	# still receive their presses normally.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	# NO background ColorRect child here. This screen paints its content in
 	# _draw(), and a CanvasItem draws itself BEFORE its children, so an opaque
 	# background child would cover everything this screen draws. The background
@@ -192,6 +204,16 @@ func _live_hint() -> String:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Touch is handled explicitly rather than through Godot's touch-to-mouse
+	# emulation. TouchControls lives in Game.tscn only, so this screen has no
+	# touch handler of its own, and relying on emulation meant relying on a
+	# project setting that is not stated anywhere and can be turned off.
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed and not _finished and Conductor.running:
+			_register_tap()
+		return
+
 	if event.is_action_pressed("pause"):
 		_back_to_menu()
 	elif event.is_action_pressed("restart"):

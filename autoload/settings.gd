@@ -33,10 +33,14 @@ var sfx_volume: float = 0.6
 var flash_effects: bool = true
 var screen_shake: bool = true
 
-## Touch steering. Tilt is the default because it leaves the whole screen free
-## as a jump target, which matters when the jump is the timed input. Pads are
-## the fallback for playing with the device flat.
-var tilt_steering: bool = true
+## Touch steering. On-screen pads are the default; tilt is opt-in.
+##
+## Tilt was the original default, on the reasoning that it leaves the whole
+## screen free as a jump target. That reasoning was sound and the result was
+## still bad on a real phone: tilt couples steering to how you are holding the
+## device, so every jump tap nudges your aim, and there is no neutral position
+## to return to. Pads are worse in theory and far better in the hand.
+var tilt_steering: bool = false
 
 var last_song_id: String = "neon_ascent"
 
@@ -72,6 +76,18 @@ func load_settings() -> void:
 	last_song_id = cfg.get_value("game", "last_song_id", last_song_id)
 	tilt_steering = cfg.get_value("controls", "tilt_steering", tilt_steering)
 
+	# One-time migration off tilt steering.
+	#
+	# Changing the default alone would not have reached anyone who had already
+	# launched the game, because their config already holds tilt_steering=true
+	# and a stored value always wins over a default. Since tilt shipped as the
+	# default, a stored `true` is far more likely to be "never touched it" than
+	# a deliberate choice, so it is flipped once and then never again: the
+	# migration marker means anyone who genuinely wants tilt can turn it back on
+	# and keep it.
+	if tilt_steering and not cfg.has_section_key("controls", "steering_migrated"):
+		tilt_steering = false
+
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
@@ -86,6 +102,9 @@ func save_settings() -> void:
 	cfg.set_value("video", "screen_shake", screen_shake)
 	cfg.set_value("game", "last_song_id", last_song_id)
 	cfg.set_value("controls", "tilt_steering", tilt_steering)
+	# Marks the tilt migration as done, so a player who deliberately chooses
+	# tilt later is never quietly switched back to pads.
+	cfg.set_value("controls", "steering_migrated", true)
 
 	if cfg.save(SAVE_PATH) != OK:
 		push_warning("Settings: could not write %s" % SAVE_PATH)

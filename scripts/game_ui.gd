@@ -16,6 +16,14 @@ extends CanvasLayer
 const POPUP_HOLD: float = 0.35
 const POPUP_FADE: float = 0.45
 
+## Inset of the pause button from the top and right edges.
+const PAUSE_MARGIN: float = 20.0
+
+## Clearance between the height readout and the pause button. Named so the two
+## are laid out against each other rather than each against the screen edge,
+## which is how they came to overlap.
+const HUD_GAP: float = 16.0
+
 signal pause_requested
 signal resume_requested
 signal restart_requested
@@ -24,6 +32,31 @@ signal menu_requested
 var _canvas: Control
 var _pause_panel: Control
 var _pause_button: Button
+
+## Top safe-area inset, cached at build time.
+var _top_inset: float = 0.0
+
+
+## The block the height readout occupies, drawn text and all.
+##
+## Exposed as a function so the pause button's placement can be ASSERTED
+## against it. The two were previously positioned independently, each against
+## the right edge of the screen, and nothing connected them: the button landed
+## on top of the readout and no test could see it, because draw_string leaves no
+## node behind to measure. Anything drawn rather than laid out needs a rect like
+## this if it is to be checked at all.
+func height_readout_rect() -> Rect2:
+	var right := Tuning.PLAYFIELD_WIDTH - Tuning.TOUCH_MIN - PAUSE_MARGIN \
+		- HUD_GAP - 200.0
+	return Rect2(right, _top_inset + 30.0, 200.0, 62.0)
+
+
+## Where the pause button sits. Same reasoning as above.
+func pause_button_rect() -> Rect2:
+	return Rect2(
+		Tuning.PLAYFIELD_WIDTH - Tuning.TOUCH_MIN - PAUSE_MARGIN,
+		_top_inset + PAUSE_MARGIN,
+		Tuning.TOUCH_MIN, Tuning.TOUCH_MIN)
 
 var _song_name: String = ""
 var _song_bpm: int = 0
@@ -57,13 +90,20 @@ func _ready() -> void:
 	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
 	_canvas.add_child(ruler)
 
+	# Cached rather than sampled per frame: it cannot change during a run, and
+	# _draw runs every frame.
+	_top_inset = UIKit.safe_area_insets().x
+
 	# A pause control on screen, because a phone has no ESC key and without one
 	# there would be no way to pause a touch run at all.
+	#
+	# Pushed below the safe-area inset. At a flat y=20 it sat underneath the
+	# Dynamic Island on a modern iPhone, which is both unreadable and awkward to
+	# hit, since the island swallows touches near it.
 	_pause_button = UIKit.button("II", UIKit.CYAN, 22)
 	_pause_button.custom_minimum_size = Vector2(Tuning.TOUCH_MIN, Tuning.TOUCH_MIN)
-	_pause_button.position = Vector2(
-		Tuning.PLAYFIELD_WIDTH - Tuning.TOUCH_MIN - 20.0, 20.0)
-	_pause_button.size = Vector2(Tuning.TOUCH_MIN, Tuning.TOUCH_MIN)
+	_pause_button.position = pause_button_rect().position
+	_pause_button.size = pause_button_rect().size
 	_pause_button.focus_mode = Control.FOCUS_NONE
 	_pause_button.pressed.connect(func(): pause_requested.emit())
 	_canvas.add_child(_pause_button)
@@ -133,21 +173,23 @@ func _draw_hud() -> void:
 		_canvas.draw_rect(Rect2(0, 0, w, h),
 			Color(UIKit.RED.r, UIKit.RED.g, UIKit.RED.b, _danger * 0.28 * throb), true)
 
-	# Score, top left.
-	_canvas.draw_string(data, Vector2(UIKit.MARGIN, 60.0),
+	# Score, top left. Everything in the top bar is offset by the safe-area
+	# inset so it clears a notch or Dynamic Island.
+	var top := _top_inset
+	_canvas.draw_string(data, Vector2(UIKit.MARGIN, 60.0 + top),
 		UIKit.thousands(int(_shown_score)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 34, UIKit.TEXT)
-	_canvas.draw_string(data, Vector2(UIKit.MARGIN + 2.0, 84.0),
+	_canvas.draw_string(data, Vector2(UIKit.MARGIN + 2.0, 84.0 + top),
 		"%s  %d BPM" % [_song_name, _song_bpm],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UIKit.DIM)
 
 	# Height, top right. Right-aligned so the digits form a stable edge as the
 	# number grows.
-	var right := w - UIKit.MARGIN - 200.0
-	_canvas.draw_string(data, Vector2(right, 60.0), "%d m" % _height,
-		HORIZONTAL_ALIGNMENT_RIGHT, 200.0, 34, UIKit.CYAN)
-	_canvas.draw_string(data, Vector2(right, 84.0), "HEIGHT",
-		HORIZONTAL_ALIGNMENT_RIGHT, 200.0, 15, UIKit.DIM)
+	var block := height_readout_rect()
+	_canvas.draw_string(data, Vector2(block.position.x, 60.0 + top), "%d m" % _height,
+		HORIZONTAL_ALIGNMENT_RIGHT, block.size.x, 34, UIKit.CYAN)
+	_canvas.draw_string(data, Vector2(block.position.x, 84.0 + top), "HEIGHT",
+		HORIZONTAL_ALIGNMENT_RIGHT, block.size.x, 15, UIKit.DIM)
 
 	if _countdown >= 0:
 		_draw_countdown(display, w, h, pulse)
