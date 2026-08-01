@@ -16,9 +16,22 @@ Download **`BounceAscent.exe`** from the
 [latest release](../../releases/latest). Windows only for now, single file, no
 installer and no runtime to fetch: the PCK is embedded in the executable.
 
-Windows SmartScreen will warn about it, because the binary is unsigned. *More
-info* then *Run anyway*. Code signing needs a certificate this project does not
-have.
+**The binary is not code signed.** Most people get a SmartScreen warning and can
+click through it: *More info* then *Run anyway*. Some people find it **blocked
+outright** with no way past, which happens under **Smart App Control** (on by
+default on clean Windows 11 22H2+ installs, and it only ever turns off, never
+back on) or under an employer's **WDAC / Device Guard** policy.
+
+This is not hypothetical. The v2.0.0 release candidate was blocked exactly this
+way on the development machine during pre-release testing:
+
+```
+'BounceAscent.exe' was blocked by your organization's Device Guard policy.
+```
+
+Signing needs a certificate this project does not have, and passing Smart App
+Control needs reputation on top of that. If you are blocked, this build is not
+for your machine.
 
 First thing in game: **Settings -> Calibrate audio**. Skipping it is the single
 biggest cause of "my timing feels wrong", for the reason explained under
