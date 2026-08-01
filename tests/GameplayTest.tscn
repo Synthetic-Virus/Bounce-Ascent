@@ -1,0 +1,7 @@
+; Headless end-to-end gameplay test. See tests/gameplay_test.gd.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/gameplay_test.gd" id="1_gameplay"]
+
+[node name="GameplayTest" type="Node"]
+script = ExtResource("1_gameplay")

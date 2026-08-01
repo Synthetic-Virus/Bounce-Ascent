@@ -1,0 +1,7 @@
+; Headless UI and lifecycle test. See tests/ui_test.gd.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/ui_test.gd" id="1_ui"]
+
+[node name="UITest" type="Node"]
+script = ExtResource("1_ui")

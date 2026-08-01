@@ -1,0 +1,7 @@
+; The beat ruler strip. See scripts/ui/beat_ruler.gd.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/beat_ruler.gd" id="1_ruler"]
+
+[node name="BeatRuler" type="Control"]
+script = ExtResource("1_ruler")

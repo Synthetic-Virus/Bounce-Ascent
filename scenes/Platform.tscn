@@ -1,0 +1,13 @@
+; A single platform. Shape and one-way collision are configured in
+; scripts/platform.gd rather than here, so that width can vary per tier without
+; needing a separate scene per size.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/platform.gd" id="1_platform"]
+
+[node name="Platform" type="StaticBody2D"]
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("1_platform")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]

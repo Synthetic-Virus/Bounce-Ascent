@@ -1,27 +1,12 @@
-# Godot 4+ specific ignores
+# Godot's import/cache directory. Regenerated on first open, and large.
 .godot/
-.import/
-
-# Godot-specific
 *.translation
-*.import
-*.md5
 
-# Mono-specific ignores
-.mono/
-data_*/
-mono_crash.*.json
+# Build output and local capture scripts.
+build/
+*.png.import
 
-# System/tool-specific
+# Editor and OS noise.
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-*~
-
-# Export builds
-exports/*.pck
-exports/*.zip
+*.tmp

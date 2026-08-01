@@ -1,6 +1,51 @@
-[gd_scene load_steps=2 format=3 uid="uid://game001"]
+; The gameplay scene.
+;
+; Node order matters for draw order: Background is first (and additionally sets
+; z_index = -100 in code), the spawner and player draw above it, and the two
+; CanvasLayers sit above everything at layers 10 and 20.
+;
+; Deliberately minimal. Collision shapes, UI widgets and visuals are all built
+; in code so that the scene file stays readable and cannot silently drift out of
+; sync with the scripts that depend on it.
+[gd_scene load_steps=10 format=3]
 
-[ext_resource type="Script" path="res://scripts/Game.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/beat_background.gd" id="2_bg"]
+[ext_resource type="Script" path="res://scripts/platform_spawner.gd" id="3_spawner"]
+[ext_resource type="Script" path="res://scripts/player.gd" id="4_player"]
+[ext_resource type="Script" path="res://scripts/game_camera.gd" id="5_camera"]
+[ext_resource type="Script" path="res://scripts/game_ui.gd" id="6_ui"]
+[ext_resource type="Script" path="res://scripts/game_over.gd" id="7_gameover"]
+[ext_resource type="Script" path="res://scripts/death_zone.gd" id="8_death"]
+[ext_resource type="Script" path="res://scripts/touch_controls.gd" id="9_touch"]
 
 [node name="Game" type="Node2D"]
-script = ExtResource("1")
+script = ExtResource("1_game")
+
+[node name="Background" type="Node2D" parent="."]
+script = ExtResource("2_bg")
+
+[node name="DeathZone" type="Node2D" parent="."]
+script = ExtResource("8_death")
+
+[node name="PlatformSpawner" type="Node2D" parent="."]
+script = ExtResource("3_spawner")
+
+[node name="Player" type="CharacterBody2D" parent="."]
+collision_layer = 1
+collision_mask = 2
+script = ExtResource("4_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
+
+[node name="GameCamera" type="Camera2D" parent="."]
+script = ExtResource("5_camera")
+
+[node name="GameUI" type="CanvasLayer" parent="."]
+script = ExtResource("6_ui")
+
+[node name="GameOver" type="CanvasLayer" parent="."]
+script = ExtResource("7_gameover")
+
+[node name="TouchControls" type="CanvasLayer" parent="."]
+script = ExtResource("9_touch")
