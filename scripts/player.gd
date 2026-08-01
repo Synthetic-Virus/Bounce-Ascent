@@ -57,6 +57,10 @@ var _flash_color: Color = Color.WHITE
 var _deform: float = 0.0
 var _deform_vel: float = 0.0
 
+## Gravity for the hop currently in flight, derived from that hop's ACTUAL
+## solved flight time. See _launch().
+var _hop_gravity: float = Tuning.GRAVITY
+
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
 
@@ -84,6 +88,7 @@ func reset(start_position: Vector2) -> void:
 	_flash = 0.0
 	_deform = 0.0
 	_deform_vel = 0.0
+	_hop_gravity = _current_gravity()
 	active = true
 
 
@@ -93,6 +98,7 @@ func reset(start_position: Vector2) -> void:
 func arm_first_jump() -> void:
 	_grounded = true
 	velocity = Vector2.ZERO
+	_hop_gravity = _current_gravity()
 	_auto_jump_at = Conductor.now() + Tuning.WINDOW_GOOD
 
 
@@ -119,7 +125,7 @@ func _physics_process(delta: float) -> void:
 	if _grounded and Conductor.now() >= _auto_jump_at:
 		_launch(Tuning.Judgement.MISS, 0.0, 1)
 
-	velocity.y += _current_gravity() * delta
+	velocity.y += _hop_gravity * delta
 	velocity.y = minf(velocity.y, Tuning.MAX_FALL_SPEED)
 
 	_apply_horizontal(delta)
@@ -226,8 +232,19 @@ func _launch(judgement: int, error: float, tiers: int) -> void:
 	var nominal := Tuning.HOP_BEATS * Conductor.sec_per_beat
 	flight = clampf(flight, nominal * FLIGHT_MIN_SCALE, nominal * FLIGHT_MAX_SCALE)
 
+	# Gravity is derived from THIS hop's flight time, not the nominal one.
+	#
+	# g = GRAVITY_SHAPE / t^2 makes the apex independent of t, which is the
+	# whole point of deriving it. Using the nominal t while solving for a longer
+	# one breaks that: the quantiser rounds to the nearest grid beat, so a hop
+	# can legitimately ask for 2.6 beats instead of 2, and under nominal gravity
+	# that pushed the apex from 300px to 429px -- past the 380px tier+2 floor.
+	# The player then clipped the tier ABOVE their target on the way down and
+	# landed a tier early, 115ms off the beat.
+	_hop_gravity = Tuning.gravity_for_flight(flight)
+
 	var launch_speed := Tuning.solve_launch_velocity(
-		Tuning.TIER_RISE * float(tiers), flight, _current_gravity())
+		Tuning.TIER_RISE * float(tiers), flight, _hop_gravity)
 
 	# Screen y grows downward, so climbing is negative.
 	velocity.y = -launch_speed

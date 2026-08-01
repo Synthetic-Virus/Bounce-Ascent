@@ -33,6 +33,8 @@ var _finished: bool = false
 var _flash: float = 0.0
 var _result_ms: float = 0.0
 var _rejected: bool = false
+var _done: Button
+var _retry: Button
 
 
 func _ready() -> void:
@@ -58,6 +60,24 @@ func _build() -> void:
 	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
 	add_child(ruler)
 
+	# Real buttons, not keyboard hints. "Press ESC when done" is meaningless on
+	# a phone, and this screen is the first thing a new player is told to visit.
+	var actions := VBoxContainer.new()
+	actions.position = Vector2(UIKit.MARGIN, Tuning.PLAYFIELD_HEIGHT - 250.0)
+	actions.size = Vector2(Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0, 190.0)
+	actions.add_theme_constant_override("separation", 12)
+	add_child(actions)
+
+	_done = UIKit.button("Done", UIKit.GOLD, 26, true)
+	_done.custom_minimum_size = Vector2(0, Tuning.TOUCH_PRIMARY)
+	_done.pressed.connect(_back_to_menu)
+	actions.add_child(_done)
+
+	_retry = UIKit.button("Start over", UIKit.CYAN, 20)
+	_retry.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	_retry.pressed.connect(_restart_taps)
+	actions.add_child(_retry)
+
 
 func _process(delta: float) -> void:
 	_flash = maxf(_flash - delta * 3.0, 0.0)
@@ -75,7 +95,7 @@ func _draw() -> void:
 	draw_string(display, Vector2(UIKit.MARGIN, 150.0),
 		"CALIBRATE", HORIZONTAL_ALIGNMENT_LEFT, -1, 54, UIKit.CYAN)
 	draw_string(data, Vector2(UIKit.MARGIN + 3.0, 184.0),
-		"match the game clock to your speakers",
+		"tap anywhere, or press space",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UIKit.DIM)
 
 	if not Conductor.running:
@@ -85,7 +105,7 @@ func _draw() -> void:
 
 	# The instruction, stated once, as an action.
 	draw_string(display, Vector2(0.0, 300.0),
-		"TAP SPACE ON EVERY KICK DRUM",
+		"TAP ON EVERY KICK DRUM",
 		HORIZONTAL_ALIGNMENT_CENTER, w, 24, UIKit.TEXT)
 
 	_draw_ring(w, h)
@@ -132,7 +152,7 @@ func _draw_progress(data: Font, w: float, h: float) -> void:
 			HORIZONTAL_ALIGNMENT_CENTER, w, 26, UIKit.GOLD)
 		draw_string(data, Vector2(0.0, y + 76.0), verdict,
 			HORIZONTAL_ALIGNMENT_CENTER, w, 18, UIKit.DIM)
-		draw_string(data, Vector2(0.0, y + 112.0), "done. press ESC to go back",
+		draw_string(data, Vector2(0.0, y + 112.0), "that is it, you are calibrated",
 			HORIZONTAL_ALIGNMENT_CENTER, w, 18, UIKit.TEXT)
 	elif _rejected:
 		# An error explains what happened and how to fix it, in the interface's
@@ -144,7 +164,7 @@ func _draw_progress(data: Font, w: float, h: float) -> void:
 			"too far out to be latency, so nothing changed",
 			HORIZONTAL_ALIGNMENT_CENTER, w, 17, UIKit.DIM)
 		draw_string(data, Vector2(0.0, y + 100.0),
-			"you were probably tapping between kicks. press R to retry",
+			"you were probably tapping between the kicks",
 			HORIZONTAL_ALIGNMENT_CENTER, w, 17, UIKit.DIM)
 	else:
 		draw_string(data, Vector2(0.0, y + 46.0),
@@ -154,18 +174,10 @@ func _draw_progress(data: Font, w: float, h: float) -> void:
 			HORIZONTAL_ALIGNMENT_CENTER, w, 18, UIKit.DIM)
 
 
-func _draw_footer(data: Font, _w: float, h: float) -> void:
-	var y := h - 190.0
-	for row in [["ESC", "back to tracks"], ["R", "start over"]]:
-		draw_string(data, Vector2(UIKit.MARGIN, y), str(row[0]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UIKit.GOLD)
-		draw_string(data, Vector2(UIKit.MARGIN + 56.0, y), str(row[1]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UIKit.DIM)
-		y += 32.0
-
-	draw_string(data, Vector2(UIKit.MARGIN, h - 100.0),
+func _draw_footer(data: Font, w: float, h: float) -> void:
+	draw_string(data, Vector2(0.0, h - 270.0),
 		"current offset  %+d ms" % int(Settings.audio_offset_ms),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UIKit.DIM)
+		HORIZONTAL_ALIGNMENT_CENTER, w, 17, UIKit.DIM)
 
 
 ## A running read on which way the player is drifting, so the screen is useful
@@ -183,11 +195,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		_back_to_menu()
 	elif event.is_action_pressed("restart"):
-		_errors.clear()
-		_finished = false
-		_rejected = false
+		_restart_taps()
 	elif event.is_action_pressed("jump") and not _finished and Conductor.running:
 		_register_tap()
+
+
+func _restart_taps() -> void:
+	_errors.clear()
+	_finished = false
+	_rejected = false
+	Music.play_sfx("ui_move")
 
 
 func _register_tap() -> void:

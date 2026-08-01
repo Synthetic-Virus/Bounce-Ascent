@@ -46,6 +46,7 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 0
 	set_process(true)
+	set_physics_process(true)
 
 
 ## Called by the spawner on creation and on recycle, so it must fully reset
@@ -112,22 +113,36 @@ func _phase_cycle() -> float:
 	return fposmod(bars / Tuning.PHASE_BARS + float(tier % 2), 2.0)
 
 
-func _process(delta: float) -> void:
-	if type == Tuning.PlatformType.MOVING and Conductor.running:
+## Movement happens in the PHYSICS step, not _process.
+##
+## A StaticBody2D repositioned once per rendered frame teleports between physics
+## ticks, so its collision shape is stale when the player arrives and the
+## landing is registered late. That was measured as a 116ms landing outlier
+## against a 25ms tolerance. Anything that decides WHEN a landing happens has to
+## move on the physics clock.
+func _physics_process(_delta: float) -> void:
+	if not Conductor.running:
+		return
+
+	if type == Tuning.PlatformType.MOVING:
 		# Tied to song position, not delta, so the sway stays locked to the
 		# music and is identical on every machine.
 		var t := Conductor.song_beats / Tuning.MOVE_BEATS_PER_CYCLE
-		global_position.x = _home_x \
-			+ sin(t * TAU + _phase_offset) * move_amplitude
+		global_position.x = _home_x + sin(t * TAU + _phase_offset) * move_amplitude
 
-	if type == Tuning.PlatformType.CRUMBLING and not _crumbled:
+	# Collision state changes on the physics clock for the same reason movement
+	# does: a shape enabled or disabled once per RENDERED frame is stale when
+	# the player arrives, which shifts the moment a landing is registered.
+	elif type == Tuning.PlatformType.CRUMBLING and not _crumbled:
 		if Conductor.now() >= _crumble_at:
 			_crumbled = true
 			_set_solid(false)
 
-	if type == Tuning.PlatformType.PHASING:
+	elif type == Tuning.PlatformType.PHASING:
 		_set_solid(is_solid())
 
+
+func _process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash = maxf(_flash - delta * 3.5, 0.0)
 

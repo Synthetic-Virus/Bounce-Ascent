@@ -66,6 +66,13 @@ func _ready() -> void:
 	_game_over.restart_requested.connect(_on_restart_requested)
 	_game_over.menu_requested.connect(_on_menu_requested)
 
+	# The HUD's on-screen pause control and pause-menu buttons, so a touch
+	# player has the same options a keyboard player does.
+	_ui.pause_requested.connect(func(): if state == State.PLAYING: _toggle_pause())
+	_ui.resume_requested.connect(func(): if state == State.PAUSED: _toggle_pause())
+	_ui.restart_requested.connect(_on_restart_requested)
+	_ui.menu_requested.connect(_on_menu_requested)
+
 	var song_id: String = Settings.last_song_id
 	song = SongLibrary.get_song(song_id)
 

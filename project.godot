@@ -116,5 +116,9 @@ common/max_physics_steps_per_frame=24
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
+
+; Required for the Android export, which refuses to run without it. Costs
+; nothing here: the game ships no textures, so there is nothing to compress.
+textures/vram_compression/import_etc2_astc=true
 environment/defaults/default_clear_color=Color(0.03, 0.02, 0.07, 1)
 anti_aliasing/quality/msaa_2d=2

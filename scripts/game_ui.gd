@@ -16,8 +16,14 @@ extends CanvasLayer
 const POPUP_HOLD: float = 0.35
 const POPUP_FADE: float = 0.45
 
+signal pause_requested
+signal resume_requested
+signal restart_requested
+signal menu_requested
+
 var _canvas: Control
 var _pause_panel: Control
+var _pause_button: Button
 
 var _song_name: String = ""
 var _song_bpm: int = 0
@@ -51,6 +57,17 @@ func _ready() -> void:
 	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
 	_canvas.add_child(ruler)
 
+	# A pause control on screen, because a phone has no ESC key and without one
+	# there would be no way to pause a touch run at all.
+	_pause_button = UIKit.button("II", UIKit.CYAN, 22)
+	_pause_button.custom_minimum_size = Vector2(Tuning.TOUCH_MIN, Tuning.TOUCH_MIN)
+	_pause_button.position = Vector2(
+		Tuning.PLAYFIELD_WIDTH - Tuning.TOUCH_MIN - 20.0, 20.0)
+	_pause_button.size = Vector2(Tuning.TOUCH_MIN, Tuning.TOUCH_MIN)
+	_pause_button.focus_mode = Control.FOCUS_NONE
+	_pause_button.pressed.connect(func(): pause_requested.emit())
+	_canvas.add_child(_pause_button)
+
 	_pause_panel = Control.new()
 	_pause_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_pause_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,6 +75,35 @@ func _ready() -> void:
 	_pause_panel.draw.connect(_draw_pause)
 	_pause_panel.visible = false
 	add_child(_pause_panel)
+	_build_pause_actions()
+
+
+## Buttons on the pause screen, for the same reason the pause control exists.
+func _build_pause_actions() -> void:
+	var col := VBoxContainer.new()
+	col.position = Vector2(UIKit.MARGIN, Tuning.PLAYFIELD_HEIGHT * 0.52)
+	col.size = Vector2(Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0, 300.0)
+	col.add_theme_constant_override("separation", 12)
+	col.process_mode = Node.PROCESS_MODE_ALWAYS
+	_pause_panel.add_child(col)
+
+	var resume := UIKit.button("Resume", UIKit.GOLD, 26, true)
+	resume.custom_minimum_size = Vector2(0, Tuning.TOUCH_PRIMARY)
+	resume.process_mode = Node.PROCESS_MODE_ALWAYS
+	resume.pressed.connect(func(): resume_requested.emit())
+	col.add_child(resume)
+
+	var restart := UIKit.button("Restart track", UIKit.CYAN, 20)
+	restart.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	restart.process_mode = Node.PROCESS_MODE_ALWAYS
+	restart.pressed.connect(func(): restart_requested.emit())
+	col.add_child(restart)
+
+	var menu := UIKit.button("Back to tracks", UIKit.CYAN, 20)
+	menu.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	menu.pressed.connect(func(): menu_requested.emit())
+	col.add_child(menu)
 
 	set_process(true)
 
@@ -168,14 +214,9 @@ func _draw_pause() -> void:
 	_pause_panel.draw_string(display, Vector2(UIKit.MARGIN, h * 0.42),
 		"PAUSED", HORIZONTAL_ALIGNMENT_LEFT, -1, 58, UIKit.CYAN)
 
-	# Actions named by what they do, in the same voice as every other screen.
-	var y := h * 0.42 + 60.0
-	for row in [["ESC", "resume climbing"], ["R", "restart this track"]]:
-		_pause_panel.draw_string(data, Vector2(UIKit.MARGIN, y), str(row[0]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UIKit.GOLD)
-		_pause_panel.draw_string(data, Vector2(UIKit.MARGIN + 60.0, y), str(row[1]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UIKit.TEXT)
-		y += 36.0
+	_pause_panel.draw_string(data, Vector2(UIKit.MARGIN, h * 0.42 + 34.0),
+		"%s  %d BPM" % [_song_name, _song_bpm],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UIKit.DIM)
 
 
 # --- Callbacks from Game ----------------------------------------------------
@@ -223,6 +264,7 @@ func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 
 func on_paused(paused: bool) -> void:
 	_pause_panel.visible = paused
+	_pause_button.visible = not paused
 
 
 func on_run_ended(_result: Dictionary) -> void:
