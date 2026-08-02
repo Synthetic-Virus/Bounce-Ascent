@@ -304,6 +304,8 @@ func _current_platform() -> Node2D:
 func _draw() -> void:
 	var pulse := Conductor.beat_pulse(4.0) if Conductor.running else 0.0
 
+	_draw_beat_ring()
+
 	# Volume-preserving squash and stretch: the horizontal scale is the exact
 	# inverse of the vertical one, so the blob keeps its area as it deforms.
 	# This is the single detail that separates "soft body" from "scaled circle";
@@ -339,6 +341,46 @@ func _draw() -> void:
 ## `wobble` bulges the sides out as the body flattens, so a squashed blob
 ## belays outward at its equator rather than staying a clean ellipse. Small, but
 ## it is what stops the shape reading as a rigid oval.
+## A ring that closes onto the player exactly ON the beat. Tap when it lands.
+##
+## THE GAME MUST BE PLAYABLE WITH THE SOUND OFF. Family testers reported that it
+## was not, and they are right: the beat existed only in the music. Everything
+## visual pulsed AFTER the beat, which tells you where the beat was, not where
+## the next one is coming. You cannot time an input to a cue that arrives late.
+##
+## Phones are muted constantly, on transit, in bed, in company, so "turn the
+## sound on" is not an answer. It rules out a large share of all sessions.
+##
+## This is the genre-standard fix, an approach circle: the ring starts wide just
+## after a beat and contracts, meeting the body at the moment of the next one, so
+## the beat becomes something you can SEE arriving rather than only hear having
+## happened. It also runs through the count-in, which turns those four beats into
+## a silent lesson in the tempo before anything is at stake.
+##
+## Always on, not a setting. A player who never opens Settings is exactly the
+## player who needs it.
+func _draw_beat_ring() -> void:
+	if not Conductor.running:
+		return
+
+	# beat_progress is 0 at the beat and approaches 1 just before the next, so
+	# the ring's radius falls as the beat nears and is at its tightest on it.
+	var progress := Conductor.beat_progress()
+	var radius := Tuning.beat_ring_radius(RADIUS, progress)
+
+	# Sharpen as it closes. A ring that is equally faint all the way round its
+	# travel reads as decoration; one that resolves reads as an approach.
+	var focus := pow(progress, 2.2)
+	var alpha := Tuning.BEAT_RING_ALPHA * (0.35 + 0.65 * focus)
+	var width := 2.0 + focus * 2.5
+
+	if not Settings.flash_effects:
+		alpha *= 0.65
+
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40,
+		Color(1.0, 1.0, 1.0, alpha), width, true)
+
+
 func _draw_blob(centre: Vector2, rx: float, ry: float, wobble: float,
 		color: Color) -> void:
 	var points := PackedVector2Array()

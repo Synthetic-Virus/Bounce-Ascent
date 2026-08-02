@@ -66,6 +66,27 @@ var _lessons_seen: Dictionary = {}
 var _coach_text: String = ""
 var _coach_age: float = 999.0
 
+# --- Beat assist -------------------------------------------------------------
+#
+# On the easiest track only, a player who keeps mistiming gets the beat shown to
+# them: a large TAP that flashes exactly ON each beat, so the moment to press is
+# not something they have to infer.
+#
+# The approach ring shows the beat COMING; this shows it ARRIVING. Together they
+# cover both halves of "when do I press", which is the entire skill the game
+# asks for and the one thing it never actually showed.
+#
+# It turns itself off the instant they land a PERFECT. An assist that stays up
+# after the player no longer needs it stops being help and starts being noise,
+# and it would also rob them of the moment they worked out the timing.
+
+## Difficulty of the running track. Assist is easiest-track only, deliberately:
+## on the harder tracks a player has already demonstrated they can do this.
+var _song_difficulty: int = 0
+
+var _miss_streak: int = 0
+var _assist_active: bool = false
+
 const COACH_HOLD: float = 2.2
 const COACH_FADE: float = 0.6
 
@@ -236,7 +257,32 @@ func _draw_hud() -> void:
 
 	_draw_lead(data, top)
 	_draw_judgement(display, data, w, pulse)
+	_draw_assist(display, w, h)
 	_draw_coach(data, w, h)
+
+
+## TAP, flashing exactly ON the beat, for a player who cannot find it.
+##
+## Peaks at the beat rather than fading from it, which is the opposite of every
+## other pulse in the game: those celebrate a beat that has happened, this one
+## marks the instant to act. Paired with the approach ring around the player,
+## which shows the same beat arriving, the two answer "when do I press" from
+## both directions.
+##
+## Only on the easiest track, only after repeated mistiming, and it disappears
+## the moment a PERFECT lands.
+func _draw_assist(display: Font, w: float, h: float) -> void:
+	if not _assist_active or not Conductor.running:
+		return
+
+	# Sharp, so the word is unmistakably ON the beat rather than glowing near it.
+	var beat := Conductor.beat_pulse(6.0)
+	var alpha := 0.25 + beat * 0.75
+	var size := 46 + int(beat * 12.0)
+
+	_canvas.draw_string(display, Vector2(0.0, h * 0.50), "TAP",
+		HORIZONTAL_ALIGNMENT_CENTER, w, size,
+		Color(UIKit.GOLD.r, UIKit.GOLD.g, UIKit.GOLD.b, alpha))
 
 
 ## One short line of coaching, low on the screen.
@@ -386,6 +432,9 @@ func _draw_pause() -> void:
 func on_run_started(song: Dictionary) -> void:
 	_song_name = str(song.get("name", ""))
 	_song_bpm = int(song.get("bpm", 0))
+	_song_difficulty = int(song.get("difficulty", 0))
+	_miss_streak = 0
+	_assist_active = false
 	_score = 0
 	_shown_score = 0.0
 	_combo = 0
@@ -486,6 +535,16 @@ func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 	# It cannot be discovered by playing: you can jump whenever, climb steadily,
 	# and never notice that timing decides how HIGH you go rather than just
 	# whether you survive.
+	# Struggle tracking for the beat assist. A PERFECT is the only thing that
+	# clears it: landing a GREAT still means the timing has not clicked yet.
+	if judgement == Tuning.Judgement.PERFECT:
+		_miss_streak = 0
+		_assist_active = false
+	elif judgement == Tuning.Judgement.MISS:
+		_miss_streak += 1
+		if _song_difficulty <= 0 and _miss_streak >= Tuning.ASSIST_AFTER_MISSES:
+			_assist_active = true
+
 	if judgement == Tuning.Judgement.PERFECT:
 		_teach("perfect", "PERFECT climbs two platforms")
 	elif judgement == Tuning.Judgement.MISS:

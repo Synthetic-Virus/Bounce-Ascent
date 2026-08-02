@@ -24,6 +24,7 @@ func _ready() -> void:
 	test_launch_velocity_analytic()
 	test_tilt_response()
 	test_judgement_labels()
+	test_beat_is_visible_without_sound()
 	test_launch_velocity_numeric()
 	test_arc_tier_separation()
 	test_difficulty_curve()
@@ -92,6 +93,47 @@ func test_judgement_labels() -> void:
 	check(not labels.has("MISS"),
 		"nothing in the game calls the player's landing a MISS")
 	print("    tiers read as: %s" % ", ".join(labels))
+
+
+## The beat must be findable with the sound OFF.
+##
+## Family testers reported the game could not be played muted, and they were
+## right: the beat lived only in the music, and every visual cue pulsed AFTER
+## each beat, which shows where the beat WAS. You cannot time an input against a
+## cue that arrives late. Phones are muted constantly, so "turn the sound on" is
+## not an answer.
+##
+## The approach ring must therefore CONTRACT toward the beat. Inverting it would
+## still animate, still be on the music, and be useless: it would be showing the
+## beat that already went.
+func test_beat_is_visible_without_sound() -> void:
+	print("- beat is visible without sound")
+	var r := 22.0
+
+	var just_after := Tuning.beat_ring_radius(r, 0.0)
+	var about_to := Tuning.beat_ring_radius(r, 1.0)
+
+	check(just_after > about_to,
+		"the ring CONTRACTS toward the beat rather than expanding away from it")
+	check_near(about_to, r, 0.001, "it closes onto the body exactly on the beat")
+	check(just_after >= r + 20.0,
+		"it opens wide enough to be seen coming (%.0fpx)" % (just_after - r))
+
+	# Monotonic, so it reads as a countdown rather than wobbling.
+	var previous := just_after + 1.0
+	for i in 21:
+		var progress := float(i) / 20.0
+		var radius := Tuning.beat_ring_radius(r, progress)
+		check(radius <= previous, "ring shrinks monotonically at p=%.2f" % progress)
+		previous = radius
+
+	# Out-of-range readings must not produce an inverted or exploding ring.
+	check_near(Tuning.beat_ring_radius(r, 1.6), r, 0.001, "clamped past the beat")
+	check(Tuning.beat_ring_radius(r, -0.4) <= just_after + 0.001,
+		"clamped before the beat")
+
+	print("    ring travels %.0fpx down to the %.0fpx body"
+		% [just_after - r, r])
 
 
 ## REGRESSION: tilt steering was an on/off switch, not a control.

@@ -73,6 +73,42 @@ const BLOB_VELOCITY_STRETCH: float = 0.00022
 ## Hard limit, so a pathological velocity cannot turn the player into a needle.
 const BLOB_MAX_DEFORM: float = 0.62
 
+# --- Beat visibility ---------------------------------------------------------
+#
+# The game has to be playable with the sound off, and it was not. Every visual
+# cue pulsed AFTER each beat, which shows where the beat WAS; timing an input
+# needs a cue that shows where the next one is COMING. See player.gd's
+# _draw_beat_ring and docs/DESIGN_RESEARCH.md.
+
+## How far beyond the player's radius the approach ring starts, in pixels.
+##
+## Wide enough to be unmistakable against a busy background, narrow enough that
+## it does not read as part of the platform being aimed at.
+const BEAT_RING_SPREAD: float = 46.0
+
+## Peak opacity of the ring as it closes.
+const BEAT_RING_ALPHA: float = 0.55
+
+## Consecutive mistimed presses on the EASIEST track before the game simply
+## shows the beat with a flashing TAP.
+##
+## Three, not one: a single fluffed press is normal and being helped after it
+## would be patronising. Three in a row is someone who has not found the beat,
+## and on the easiest track the right response is to show it to them rather than
+## let them keep guessing.
+const ASSIST_AFTER_MISSES: int = 3
+
+
+## Radius of the approach ring, for a body radius and a position within the beat.
+##
+## `progress` is 0 at a beat and approaches 1 just before the next, so the ring
+## must SHRINK as progress rises. Separated from the draw call because that
+## direction is the whole point and inverting it would produce a ring that
+## expands away from the beat: still animated, still on the music, and useless
+## to time against, because it would be showing the beat that has already gone.
+static func beat_ring_radius(body_radius: float, progress: float) -> float:
+	return body_radius + (1.0 - clampf(progress, 0.0, 1.0)) * BEAT_RING_SPREAD
+
 # --- Horizontal steering ----------------------------------------------------
 
 ## One hop covers about 536px including acceleration from rest, comfortably more
