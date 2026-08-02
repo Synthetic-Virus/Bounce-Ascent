@@ -105,6 +105,13 @@ func start_run() -> void:
 	state = State.COUNTDOWN
 	_game_over.hide_panel()
 
+	# Capture how the device is being held right now as tilt centre. The
+	# count-in is the one moment in a run when the player is reliably still and
+	# not steering, which makes it the only good time to ask.
+	var touch := get_node_or_null("TouchControls")
+	if touch != null and touch.has_method("recentre_tilt"):
+		touch.recentre_tilt()
+
 	# Tier 0 sits at START_POSITION.y and the player starts resting ON it, not
 	# hovering above it. A 2px gap lets the body settle onto the surface within
 	# a frame; any larger and the run would open with an unquantised free fall.

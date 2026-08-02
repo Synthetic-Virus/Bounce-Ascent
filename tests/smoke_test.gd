@@ -22,6 +22,7 @@ func _ready() -> void:
 	print("=== Bounce Ascent smoke test ===")
 
 	test_launch_velocity_analytic()
+	test_tilt_response()
 	test_launch_velocity_numeric()
 	test_arc_tier_separation()
 	test_difficulty_curve()
@@ -60,6 +61,48 @@ func check_near(actual: float, expected: float, tolerance: float, what: String) 
 
 
 # --- Jump physics -----------------------------------------------------------
+
+## REGRESSION: tilt steering was an on/off switch, not a control.
+##
+## The thresholds were written as though the sensor reported normalised gravity
+## in 0..1. Godot's accelerometer reports m/s^2, about 9.81 at rest, so the old
+## TILT_FULL of 0.45 meant full steer at 2.6 DEGREES of lean, with a dead zone
+## of 0.3 degrees that resting hand tremor exceeded.
+##
+## Nothing could catch it: the whole calculation lived in a _process that needs
+## a physical device to produce any reading at all. Hence Tuning.tilt_response,
+## which is pure maths over degrees and can simply be checked.
+func test_tilt_response() -> void:
+	print("- tilt steering response")
+
+	check_near(Tuning.tilt_response(0.0), 0.0, 0.0001, "level is no steer")
+	check_near(Tuning.tilt_response(Tuning.TILT_DEAD_DEG - 0.5), 0.0, 0.0001,
+		"inside the dead zone is no steer")
+	check_near(Tuning.tilt_response(Tuning.TILT_FULL_DEG), 1.0, 0.0001,
+		"full tilt is full steer")
+	check_near(Tuning.tilt_response(Tuning.TILT_FULL_DEG * 3.0), 1.0, 0.0001,
+		"beyond full tilt stays clamped")
+	check_near(Tuning.tilt_response(-Tuning.TILT_FULL_DEG), -1.0, 0.0001,
+		"tilt is symmetric")
+
+	# The heart of the bug: a small lean must NOT be full steer. Five degrees is
+	# comfortably inside what a hand does without meaning to.
+	var small := Tuning.tilt_response(5.0)
+	check(small > 0.0 and small < 0.35,
+		"a 5 degree lean is a gentle nudge, not full steer (got %.2f)" % small)
+
+	# The curve gives finer control near centre than a straight line would.
+	var mid := Tuning.tilt_response(
+		(Tuning.TILT_DEAD_DEG + Tuning.TILT_FULL_DEG) * 0.5)
+	check(mid < 0.5, "mid tilt is below linear, so small corrections are fine "
+		+ "grained (got %.2f)" % mid)
+
+	# Usable range must be wide enough to aim inside, not a hair trigger.
+	check(Tuning.TILT_FULL_DEG - Tuning.TILT_DEAD_DEG >= 10.0,
+		"at least 10 degrees of usable travel between dead zone and full")
+	print("    dead %.1f deg, full %.1f deg, 5 deg gives %.2f"
+		% [Tuning.TILT_DEAD_DEG, Tuning.TILT_FULL_DEG, small])
+
 
 ## The solver must invert the integrator the game ACTUALLY runs.
 ##

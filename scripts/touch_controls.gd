@@ -10,17 +10,24 @@ extends CanvasLayer
 ## Tilt the device   steer  (opt-in, Settings.tilt_steering)
 ##
 ## Doodle Jump steers by tilt and has no jump input at all; you bounce on
-## contact. We cannot copy that, because the timed jump IS this game, and that
-## difference is what sank tilt here. Doodle Jump can afford tilt precisely
-## because it has no other touch input: nothing you do with your hands fights
-## the accelerometer. Give the same player a jump they must tap on the beat, and
-## every tap perturbs the device's attitude, so aiming and timing corrupt each
-## other. There is also no neutral to return to, because "level" depends on how
-## you happen to be sitting.
+## contact. We cannot copy that, because the timed jump IS this game: the player
+## taps on every beat, and each tap disturbs the device.
 ##
-## So pads are the default despite costing screen area, and despite the jump
-## being worth the largest target we can give it. Tilt is kept as an option
-## because it does suit playing one-handed, and because taste varies.
+## That is survivable, but only if tilt is built for it, and the first version
+## was not. It read get_accelerometer(), which reports gravity PLUS user
+## acceleration, so every jump tap was fed directly into steering. It compared
+## the raw x axis, which is only meaningful held perfectly upright. It applied
+## no smoothing to a noisy sensor. And its thresholds were written as if the
+## sensor reported normalised gravity, when Godot reports m/s^2, so full steer
+## arrived at 2.6 degrees of lean and the dead zone was narrower than tremor.
+##
+## Now: fused gravity, an angle rather than an axis, centred on however the
+## player is actually holding the device, low-passed, and thresholded in real
+## degrees.
+##
+## Pads remain the default anyway, because they cost nothing to learn and work
+## with the device flat on a table. Tilt is a genuine option rather than a
+## fallback.
 ##
 ## The jump stays tap-anywhere in both schemes, including the area above the
 ## pads, so it keeps nearly the whole screen either way.
@@ -45,6 +52,12 @@ var _pad_right: bool = false
 var _pad_left_touch: int = -1
 var _pad_right_touch: int = -1
 
+## Tilt state. `_tilt_neutral` is the roll angle treated as centre, captured
+## from however the player is actually holding the device rather than assumed.
+var _tilt_neutral: float = 0.0
+var _tilt_filtered: float = 0.0
+var _tilt_centred: bool = false
+
 
 func _ready() -> void:
 	layer = 5
@@ -62,25 +75,84 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _active:
 		return
 
 	if Settings.tilt_steering:
-		# Accelerometer x is the long axis in portrait. Dead zone first so a
-		# hand that is not perfectly level does not drift.
-		var raw := Input.get_accelerometer().x
-		var sign_v := signf(raw)
-		var mag := clampf(
-			(absf(raw) - Tuning.TILT_DEAD) / (Tuning.TILT_FULL - Tuning.TILT_DEAD),
-			0.0, 1.0)
-		_steer = sign_v * mag
+		_steer = _tilt_steer(delta)
 	else:
 		_steer = (1.0 if _pad_right else 0.0) - (1.0 if _pad_left else 0.0)
 
 	_apply_steer()
 	if _pads != null and not Settings.tilt_steering:
 		_pads.queue_redraw()
+
+
+## Roll of the device within the screen plane, in radians, where 0 is "down is
+## straight down the screen".
+##
+## GRAVITY, not the accelerometer. get_accelerometer() reports gravity PLUS
+## whatever the player is doing to the device, and in this game the player is
+## tapping the screen on every beat. Feeding that into steering meant the jump
+## input actively fought the steering input several times a second, which is a
+## large part of why tilt felt uncontrollable. get_gravity() is sensor-fused and
+## excludes user acceleration, so a tap barely moves it.
+##
+## atan2 rather than reading x directly, because x alone is only meaningful if
+## the device is held perfectly upright. Pitching the phone back, which is how
+## everyone actually holds one, shrinks the in-plane component and quietly
+## rescales the whole control. An angle does not care.
+func _tilt_roll() -> float:
+	var g := Input.get_gravity()
+	if g.length_squared() < 1.0:
+		# No fused gravity: fall back to the raw accelerometer. Noisier, but a
+		# working control beats none on a device that lacks the fused sensor.
+		g = Input.get_accelerometer()
+	if g.length_squared() < 1.0:
+		return 0.0
+	return atan2(g.x, -g.y)
+
+
+## Steer from tilt, relative to however the player happens to be holding it.
+func _tilt_steer(delta: float) -> float:
+	var roll := _tilt_roll()
+
+	# First sample of a session defines centre. There is no such thing as an
+	# absolute "level": people hold phones pitched back and slightly rolled, and
+	# assuming zero meant the game started already steering.
+	if not _tilt_centred:
+		_tilt_neutral = roll
+		_tilt_filtered = 0.0
+		_tilt_centred = true
+
+	var offset := wrapf(roll - _tilt_neutral, -PI, PI)
+
+	# Exponential smoothing, framerate independent.
+	_tilt_filtered = lerpf(_tilt_filtered, offset,
+		1.0 - exp(-Tuning.TILT_SMOOTHING * delta))
+
+	var steer := Tuning.tilt_response(rad_to_deg(_tilt_filtered))
+
+	# Inside the dead zone, let the neutral creep toward how the device is being
+	# held now. A player who shifts in their seat gets re-centred within a couple
+	# of seconds instead of carrying a permanent lean, and because it only runs
+	# while they are not steering it cannot fight a deliberate hold.
+	if steer == 0.0:
+		_tilt_neutral = wrapf(
+			_tilt_neutral + offset * Tuning.TILT_RECENTRE_RATE * delta, -PI, PI)
+
+	return steer
+
+
+## Forget the neutral so the next sample re-centres.
+##
+## Called at the start of a run, when the player is holding still through the
+## count-in, and after focus loss, since the device has usually been put down
+## and picked up again by then.
+func recentre_tilt() -> void:
+	_tilt_centred = false
+	_tilt_filtered = 0.0
 
 
 ## Drive the same actions the keyboard uses, with analogue strength from tilt,
@@ -147,6 +219,9 @@ func _release_all() -> void:
 	_pad_left_touch = -1
 	_pad_right_touch = -1
 	_steer = 0.0
+	# The device has almost certainly been moved while the app was away, so the
+	# old neutral is meaningless.
+	recentre_tilt()
 	Input.action_release("move_left")
 	Input.action_release("move_right")
 	Input.action_release("jump")

@@ -210,10 +210,62 @@ const TOUCH_ROW: float = 96.0
 ## main action should be findable without looking.
 const TOUCH_PRIMARY: float = 120.0
 
-## Tilt steering. Accelerometer x beyond DEAD is full steer at TILT_FULL, so the
-## player never has to tip the device further than a comfortable wrist angle.
-const TILT_DEAD: float = 0.05
-const TILT_FULL: float = 0.45
+## Tilt steering, in DEGREES of roll away from however the player is holding
+## the device.
+##
+## Degrees, not raw sensor units, because the previous constants were the whole
+## problem. They were 0.05 and 0.45, written as though the sensor reported
+## normalised gravity in 0..1. Godot reports m/s^2, about 9.81 at rest, so
+## "full steer" was 2.6 degrees and the dead zone was 0.3. Past a three degree
+## lean the control was pinned at maximum, and hand tremor while sitting still
+## exceeded the dead zone. It read as an unusable on/off switch because that is
+## effectively what it was.
+##
+## 2.5 degrees is wider than resting tremor. 16 is a relaxed wrist roll rather
+## than a reach, and past about 20 the screen starts turning away from you,
+## which is its own problem in a game you have to read while playing.
+##
+## The gap between them is what matters. The old settings left 2.3 degrees of
+## usable travel; these leave 13.5, so there is somewhere to aim.
+const TILT_DEAD_DEG: float = 2.5
+const TILT_FULL_DEG: float = 16.0
+
+## Exponent on the normalised tilt. Above 1.0 the centre of the range is finer
+## grained than the edge, which is what makes small corrections possible without
+## giving up the ability to cross the playfield quickly.
+##
+## Kept mild on purpose. A steeper curve reads as fine control on paper and as a
+## dead zone in the hand: at 1.6 a real 5 degree lean produced 4% of top speed,
+## which is indistinguishable from the control not working. At 1.4 the same lean
+## gives 9%, 8 degrees gives 28%, and 12 gives 61%.
+const TILT_CURVE: float = 1.4
+
+## Low-pass rate for the tilt reading, per second. The sensor is noisy and a
+## hand is never still; without this the player jitters in place.
+##
+## 14 settles in roughly 70ms, which is below the point where steering starts to
+## feel disconnected from the wrist.
+const TILT_SMOOTHING: float = 14.0
+
+## How far the neutral reference drifts toward the current hold, per second,
+## while the player is not steering. Lets a posture change settle out instead of
+## leaving a permanent bias, without fighting a deliberate held lean.
+const TILT_RECENTRE_RATE: float = 0.35
+
+
+## Steer value in -1..1 for a roll offset in degrees.
+##
+## Separated from the sensor read so the thresholds and the curve can be
+## ASSERTED. The original bug was purely in these numbers, and it was invisible
+## because the whole calculation lived inside a _process that needs a physical
+## device to produce any input at all.
+static func tilt_response(degrees: float) -> float:
+	var magnitude := clampf(
+		(absf(degrees) - TILT_DEAD_DEG) / (TILT_FULL_DEG - TILT_DEAD_DEG),
+		0.0, 1.0)
+	if magnitude <= 0.0:
+		return 0.0
+	return signf(degrees) * pow(magnitude, TILT_CURVE)
 
 ## On-screen steer pads, used when tilt is off. Bottom corners, large.
 const PAD_SIZE: float = 150.0
