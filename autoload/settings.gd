@@ -54,6 +54,14 @@ func _ready() -> void:
 	load_settings()
 	_apply_volumes()
 
+	# Rasterise the embedded fonts now rather than mid-run.
+	#
+	# Lives here only because Settings is the FIRST autoload, so this is the
+	# earliest point in the process where it can happen, and it must happen
+	# before any scene draws. See UIKit.warm_fonts() for why a lazy first draw
+	# is a correctness problem in this game rather than a stutter.
+	UIKit.warm_fonts()
+
 
 ## Missing file or missing keys fall back to the defaults above, so a corrupt or
 ## partial config never blocks launch.

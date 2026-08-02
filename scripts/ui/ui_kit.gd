@@ -113,24 +113,30 @@ static var _display: Font
 static var _data: Font
 
 
-## Condensed grotesque for headings and primary actions.
+const DISPLAY_FONT_PATH: String = "res://assets/fonts/Rajdhani-SemiBold.ttf"
+const DATA_FONT_PATH: String = "res://assets/fonts/SpaceMono-Regular.ttf"
+
+
+## Condensed techno grotesque for headings and primary actions.
 ##
-## The Apple entries are not optional garnish. The list used to be Bahnschrift,
-## Segoe UI Semibold, Arial Narrow, every one of which is a WINDOWS face, so on
-## iOS none resolved and headings dropped to Godot's generic built-in. The list
-## was ordered for the machine it was written on: Windows matches on entry one,
-## so the rest was never exercised during development.
+## EMBEDDED, not requested from the OS. Asking the system for fonts by name was
+## a standing bug rather than a saving: the name list was all Windows faces, so
+## on iOS none resolved, headings silently fell back to Godot's generic built-in
+## and body text rendered in Courier New. That was invisible on the machine the
+## list was written for, because Windows matches on entry one.
 ##
-## Avenir Next Condensed comes before SF Pro deliberately. SF is the more
-## "native" answer, but this is a game and its display face should have some
-## character; Avenir Next Condensed is also far closer to Bahnschrift's
-## proportions, so the layout keeps the same rhythm across platforms.
+## Shipping the file also means the game looks the SAME on every platform. With
+## SystemFont it was at the mercy of whatever each OS happened to have, so the
+## layout, and the letter-spacing tuned against it, drifted per device.
+##
+## Rajdhani is squared and condensed, which suits a neon grid, holds up in
+## all-caps at display sizes, and keeps roughly the proportions the layout was
+## built around. SIL Open Font License, so embedding and commercial use are
+## unambiguous; the licence ships alongside it in assets/fonts/.
 static func display_font() -> Font:
 	if _display == null:
-		_display = _system([
-			"Bahnschrift", "Segoe UI Semibold",          # Windows
-			"Avenir Next Condensed", "SF Pro Display",   # iOS / macOS
-			"Arial Narrow", "DejaVu Sans",               # last resort
+		_display = _embedded(DISPLAY_FONT_PATH, [
+			"Bahnschrift", "Avenir Next Condensed", "Arial Narrow", "DejaVu Sans",
 		])
 	return _display
 
@@ -140,18 +146,60 @@ static func display_font() -> Font:
 ## Monospace is load-bearing, not decoration: the track rows are laid out with
 ## printf padding ("%-13s"), which only lines up in a fixed-pitch face.
 ##
-## Menlo is the important addition. Courier New was previously the ONLY name in
-## this list that exists on iOS, so every non-primary button on the phone was
-## rendering in a 1955 typewriter face, which is most of what made the menus
-## look foreign.
+## Space Mono is a fixed-pitch face with actual character rather than a coding
+## font borrowed into a game. Also SIL OFL.
 static func data_font() -> Font:
 	if _data == null:
-		_data = _system([
-			"Consolas", "Cascadia Mono",                 # Windows
-			"SF Mono", "Menlo",                          # iOS / macOS
-			"Courier New", "DejaVu Sans Mono",           # last resort
+		_data = _embedded(DATA_FONT_PATH, [
+			"Consolas", "SF Mono", "Menlo", "Courier New", "DejaVu Sans Mono",
 		])
 	return _data
+
+
+## Sizes the game draws at. Warmed up front; see warm_fonts().
+const FONT_SIZES: Array[int] = [
+	14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 32, 34, 46, 54, 58, 62, 72, 150,
+]
+
+
+## Rasterise every glyph the game will need, before anything is timed.
+##
+## REQUIRED, not an optimisation. Godot rasterises a glyph the first time it is
+## drawn at a given size, and embedding the fonts moved that work from the OS
+## into our process. Doing it lazily meant the first PERFECT of a run, or the
+## first time the score grew a digit, stalled a frame mid-play.
+##
+## In a rhythm game a stalled frame is not a cosmetic hitch: arcs are solved
+## against the audio clock but simulated in physics time, so a stall lands late
+## and shows up as a missed beat the player did not miss. Measured on the
+## gameplay suite, embedding the fonts without this produced landing errors of
+## 92ms and 128ms against a 25ms tolerance, where system fonts stayed under 19ms
+## across every run.
+##
+## ASCII 32..126 covers every character the game draws: scores, judgements,
+## track names and menu labels are all Latin and punctuation.
+static func warm_fonts() -> void:
+	for f in [display_font(), data_font()]:
+		var file := f as FontFile
+		if file == null:
+			continue  # SystemFont fallback: the OS already has these cached.
+		for size in FONT_SIZES:
+			file.render_range(0, Vector2i(size, 0), 32, 126)
+
+
+## Load a shipped font, falling back to system names if it is missing.
+##
+## The fallback is not decoration either. A font that fails to load returns null
+## and every draw_string silently renders nothing, which is a blank screen with
+## no error. Better to look wrong than to look broken.
+static func _embedded(path: String, fallback_names: Array) -> Font:
+	if ResourceLoader.exists(path):
+		var f := load(path) as FontFile
+		if f != null:
+			f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO
+			return f
+	push_warning("UIKit: %s missing, falling back to a system font" % path)
+	return _system(fallback_names)
 
 
 ## Names are tried in order; if none resolve, Godot falls back to its default,

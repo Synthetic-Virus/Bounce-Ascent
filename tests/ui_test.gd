@@ -168,6 +168,35 @@ func _test_menu_layout() -> void:
 			check(not r.intersects(other),
 				"track rows %d and %d do not overlap" % [i, j])
 
+	# Track row TEXT must fit inside the row.
+	#
+	# These rows are printf-padded ("%3d BPM  %-13s"), so they only line up in a
+	# fixed-pitch face, and their length is set by the widest possible score.
+	# Swapping the data font changes the advance width of every character at
+	# once: moving from Consolas to Space Mono widened 10 characters from 132px
+	# to 147px, an 11% jump applied to a string that already nearly filled the
+	# row. A Button silently clips overflowing text, so nothing else here would
+	# have noticed.
+	#
+	# Measured against the worst case rather than the current scores, because
+	# the rows get longer as the player gets better and a fit that only holds
+	# until someone scores a million is not a fit.
+	var font: Font = UIKit.data_font()
+	var row_size: int = tracks[0].get_theme_font_size("font_size")
+	var inner: float = tracks[0].size.x - 36.0  # stylebox content margins
+	for i in tracks.size():
+		var song: Dictionary = SongLibrary.all_songs()[i]
+		var worst := "> %3d BPM  %-13s %s best %s" % [
+			int(song["bpm"]), str(song["name"]).to_upper(),
+			"***", UIKit.thousands(9999999)]
+		var w: float = font.get_string_size(
+			worst, HORIZONTAL_ALIGNMENT_LEFT, -1, row_size).x
+		check(w <= inner,
+			"track row %d fits its worst-case text (%.0fpx of %.0fpx)"
+				% [i, w, inner])
+		if i == 0:
+			print("    worst-case row: %.0fpx of %.0fpx available" % [w, inner])
+
 	# The primary action must be the largest target and sit below the list.
 	var play: Button = menu._play
 	var play_area := play.size.x * play.size.y
