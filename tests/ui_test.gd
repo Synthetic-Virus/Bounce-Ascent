@@ -457,6 +457,37 @@ func _test_hud_layout() -> void:
 	# with nothing relating them, and they overlapped by 52px. Invisible to every
 	# existing assertion because draw_string leaves no node to measure, which is
 	# why both now expose a rect.
+	# Coaching: every lesson fires at most once, and only while teaching.
+	#
+	# A hint that repeats is worse than no hint. The second PERFECT of a run
+	# should feel like a win, not like the game explaining the same thing again.
+	ui.set_teaching(true)
+	ui.on_judged(Tuning.Judgement.PERFECT, 0.0, 1, Tuning.PERFECT_TIER_SKIP)
+	var first: String = ui._coach_text
+	check(not first.is_empty(), "a first PERFECT teaches what it bought")
+
+	ui._coach_text = ""
+	ui.on_judged(Tuning.Judgement.PERFECT, 0.0, 2, Tuning.PERFECT_TIER_SKIP)
+	check(ui._coach_text.is_empty(), "the same lesson does not fire twice")
+
+	# LATE and EARLY must advise opposite corrections. Getting this backwards
+	# would coach every new player in exactly the wrong direction.
+	ui.on_judged(Tuning.Judgement.MISS, 0.15, 0, 1)
+	var late_hint: String = ui._coach_text
+	ui.on_judged(Tuning.Judgement.MISS, -0.15, 0, 1)
+	var early_hint: String = ui._coach_text
+	check(late_hint != early_hint and not early_hint.is_empty(),
+		"late and early are coached differently")
+	check("sooner" in late_hint.to_lower(),
+		"a late press is told to tap sooner (got '%s')" % late_hint)
+
+	# A returning player is not lectured.
+	ui.set_teaching(false)
+	ui._coach_text = ""
+	ui.on_judged(Tuning.Judgement.PERFECT, 0.0, 1, Tuning.PERFECT_TIER_SKIP)
+	check(ui._coach_text.is_empty(), "a player with a record is not coached")
+	print("    lessons: '%s' / '%s'" % [first, late_hint])
+
 	var pause_rect: Rect2 = ui.pause_button_rect()
 	var height_rect: Rect2 = ui.height_readout_rect()
 	check(not pause_rect.intersects(height_rect),

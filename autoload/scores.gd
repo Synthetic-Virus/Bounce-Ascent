@@ -57,6 +57,18 @@ func table_for(song_id: String) -> Array:
 
 
 ## The single best score for a song, or 0 if none has been set.
+## True once the player has finished any run on any track.
+##
+## Drives whether a run coaches the player. Deliberately "has finished a run"
+## rather than "has launched the app": someone who bounced off the menu once
+## still needs teaching next time.
+func has_any_record() -> bool:
+	for song_id in _tables:
+		if not (_tables[song_id] as Array).is_empty():
+			return true
+	return false
+
+
 func best_score(song_id: String) -> int:
 	var table := table_for(song_id)
 	if table.is_empty():

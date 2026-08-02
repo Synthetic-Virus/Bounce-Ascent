@@ -46,6 +46,29 @@ var _lead_trend: float = 0.0
 ## Seconds remaining on the "+1" flourish that fires when a PERFECT is landed.
 var _lead_gain_flash: float = 0.0
 
+# --- Coaching ----------------------------------------------------------------
+#
+# A first-time player is taught DURING their first run, by things that happen,
+# rather than by a screen of text before it.
+#
+# This replaces relying on the How to play page. The evidence is consistent that
+# effective onboarding is interactive, that players learn by doing rather than
+# reading, and that a streamlined introduction is worth 20-25% more retained
+# players in week one, which is more than any amount of visual polish is worth.
+# See docs/DESIGN_RESEARCH.md.
+#
+# Each lesson fires ONCE, only when the thing it describes has actually just
+# happened to the player, and only on their first run. There is no tutorial to
+# skip and nothing to dismiss.
+
+var _teaching: bool = false
+var _lessons_seen: Dictionary = {}
+var _coach_text: String = ""
+var _coach_age: float = 999.0
+
+const COACH_HOLD: float = 2.2
+const COACH_FADE: float = 0.6
+
 
 ## The block the height readout occupies, drawn text and all.
 ##
@@ -160,6 +183,7 @@ func _build_pause_actions() -> void:
 
 func _process(delta: float) -> void:
 	_popup_age += delta
+	_coach_age += delta
 	_lead_gain_flash = maxf(_lead_gain_flash - delta * 1.4, 0.0)
 	_shown_score = move_toward(_shown_score, float(_score),
 		maxf(900.0, absf(float(_score) - _shown_score) * 6.0) * delta)
@@ -212,6 +236,28 @@ func _draw_hud() -> void:
 
 	_draw_lead(data, top)
 	_draw_judgement(display, data, w, pulse)
+	_draw_coach(data, w, h)
+
+
+## One short line of coaching, low on the screen.
+##
+## Placed BELOW the player rather than above. The judgement popup already owns
+## the upper third and the player's eye is on the platform they are aiming at;
+## a second message up there competes with the first for the same glance. Low
+## and centred is peripheral, which is what a hint should be.
+func _draw_coach(data: Font, w: float, h: float) -> void:
+	if _coach_text.is_empty() or _coach_age > COACH_HOLD + COACH_FADE:
+		return
+
+	var alpha := 1.0
+	if _coach_age > COACH_HOLD:
+		alpha = clampf(1.0 - (_coach_age - COACH_HOLD) / COACH_FADE, 0.0, 1.0)
+	# Ease in as well, so it arrives rather than blinks into existence.
+	alpha *= clampf(_coach_age / 0.18, 0.0, 1.0)
+
+	_canvas.draw_string(data, Vector2(0.0, h * 0.78), _coach_text,
+		HORIZONTAL_ALIGNMENT_CENTER, w, 22,
+		Color(UIKit.GOLD.r, UIKit.GOLD.g, UIKit.GOLD.b, alpha))
 
 
 ## LEAD: how far ahead of the death line the player is, and which way it is going.
@@ -351,7 +397,28 @@ func on_run_started(song: Dictionary) -> void:
 	_lead_slow = -1.0
 	_lead_trend = 0.0
 	_lead_gain_flash = 0.0
+	_coach_text = ""
+	_coach_age = 999.0
 	_pause_panel.visible = false
+
+
+## Turn coaching on for this run. Game decides, from whether the player has ever
+## finished one.
+func set_teaching(on: bool) -> void:
+	_teaching = on
+	_lessons_seen.clear()
+
+
+## Show a lesson, once per run, and only while teaching.
+##
+## Keyed so a lesson cannot repeat: the second PERFECT of a run should feel like
+## a win, not like the game explaining the same thing again.
+func _teach(key: String, text: String) -> void:
+	if not _teaching or _lessons_seen.has(key):
+		return
+	_lessons_seen[key] = true
+	_coach_text = text
+	_coach_age = 0.0
 
 
 func on_countdown(beats_remaining: int) -> void:
@@ -360,6 +427,9 @@ func on_countdown(beats_remaining: int) -> void:
 
 func on_countdown_finished() -> void:
 	_countdown = -1
+	# The instruction arrives as the player is released, not before. Four short
+	# words, phrased as the action to take.
+	_teach("start", "Tap on every beat")
 
 
 func on_tick(
@@ -394,6 +464,12 @@ func on_tick(
 	_lead_slow = lerpf(_lead_slow, lead, 0.02)
 	_lead_trend = _lead_shown - _lead_slow
 
+	# Taught the first time the player is actually losing ground, which is the
+	# only moment the sentence means anything. Explaining the death line before
+	# it is chasing them is explaining a rule with no referent.
+	if _lead_trend < -0.12:
+		_teach("losing", "The line is gaining. PERFECTs outrun it.")
+
 
 func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 	_judgement = judgement
@@ -405,6 +481,20 @@ func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 	# which is the half the player could not previously see.
 	if tiers >= Tuning.PERFECT_TIER_SKIP:
 		_lead_gain_flash = 0.9
+
+	# The central rule, taught at the exact moment the player has just done it.
+	# It cannot be discovered by playing: you can jump whenever, climb steadily,
+	# and never notice that timing decides how HIGH you go rather than just
+	# whether you survive.
+	if judgement == Tuning.Judgement.PERFECT:
+		_teach("perfect", "PERFECT climbs two platforms")
+	elif judgement == Tuning.Judgement.MISS:
+		# Corrective, and in the direction that fixes it. "Tap sooner" is an
+		# instruction; "MISS" was a verdict.
+		if error > 0.0:
+			_teach("late", "That was late. Tap sooner.")
+		else:
+			_teach("early", "That was early. Wait for the beat.")
 	_popup_age = 0.0
 
 

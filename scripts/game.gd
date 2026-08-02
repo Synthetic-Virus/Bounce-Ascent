@@ -128,6 +128,10 @@ func start_run() -> void:
 	# Freeze the player through the count-in.
 	_player.active = false
 
+	# Coach only a player who has never finished a run. Checked per run rather
+	# than once at launch, so the lessons stop the moment they have a record
+	# instead of following them through a whole session.
+	_ui.set_teaching(not Scores.has_any_record())
 	_ui.on_run_started(song)
 
 	Conductor.start(song)
