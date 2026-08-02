@@ -1,0 +1,49 @@
+name: Pages
+
+# Publishes the privacy policy and support pages that the App Store requires.
+#
+# Apple will not accept a submission without a reachable privacy policy URL and
+# a support URL, regardless of whether the app collects anything. This game
+# collects nothing, but the disclosure is still mandatory.
+#
+# ONLY the site/ directory is published. The default "deploy from a branch"
+# setting would put docs/ on the public web too, which would mean publishing the
+# signing runbook and the release checklist as web pages. They are readable in
+# the repo already, but there is a difference between readable and indexed, and
+# no reason to serve them.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy midway, but do not queue up redundant ones either.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

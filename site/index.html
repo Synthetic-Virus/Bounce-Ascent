@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bounce Ascent</title>
+<meta name="description" content="A beat-synced vertical climb. Every jump arc is quantised to the music, so landing on a platform and landing on a beat are the same event.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="ruler" aria-hidden="true"></div>
+<main>
+  <p class="eyebrow">Godot 4 &middot; iOS &middot; Windows</p>
+  <h1>Bounce<br>Ascent</h1>
+  <p class="hero-sub">Land on the beat.</p>
+
+  <p class="lede">
+    Time your jump well and you climb two platforms instead of one, in the same
+    amount of time. That is the whole game.
+  </p>
+
+  <p>
+    Most jumping games pick a jump strength and let the physics decide when you
+    land. This one does the opposite: it picks the landing moment first, as an
+    exact number of beats, then solves for the launch velocity that gets you
+    there. Landing on a platform and landing on a beat are the same event, so
+    the natural instinct, pressing jump the moment you touch down, <em>is</em>
+    pressing on the beat.
+  </p>
+
+  <p>
+    A hazard line rises through the level from below and speeds up as you go.
+    Ordinary timing outruns it early on. Later it does not.
+  </p>
+
+  <h2>Scoring</h2>
+  <table>
+    <tr><th>Judgement</th><th>Window</th><th>Effect</th></tr>
+    <tr><td>PERFECT</td><td>&plusmn;45 ms</td><td>climbs <strong>two</strong> platforms</td></tr>
+    <tr><td>GREAT</td><td>&plusmn;90 ms</td><td>climbs one</td></tr>
+    <tr><td>GOOD</td><td>&plusmn;160 ms</td><td>climbs one</td></tr>
+    <tr><td>MISS</td><td>beyond</td><td>climbs one, combo resets</td></tr>
+  </table>
+
+  <h2>Download</h2>
+  <p>
+    <a class="cta" href="https://github.com/Synthetic-Virus/Bounce-Ascent/releases/latest">Windows build</a>
+  </p>
+  <p class="note">
+    Unsigned, so Windows will warn about it and some machines running Smart App
+    Control will block it outright. iOS is in TestFlight.
+  </p>
+
+  <h2>Sound</h2>
+  <p>
+    Three tracks, and there is not a single audio file in the build. Everything
+    is synthesised from note tables at runtime while you are in the menu, then
+    cached. The first thing to do in game is
+    <strong>Settings &rarr; Calibrate audio</strong>: output latency varies by
+    more than 200&nbsp;ms between wired headphones and Bluetooth, which is far
+    wider than the 45&nbsp;ms PERFECT window.
+  </p>
+
+  <footer>
+    <a href="privacy/">Privacy</a> &middot;
+    <a href="support/">Support</a> &middot;
+    <a href="https://github.com/Synthetic-Virus/Bounce-Ascent">Source</a>
+  </footer>
+</main>
+</body>
+</html>
