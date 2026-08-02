@@ -16,7 +16,6 @@ static func build() -> Dictionary:
 		"great": _blip(990.0, 0.09, Synth.WAVE_PULSE, 0.30, 7.0),
 		"good": _blip(660.0, 0.08, Synth.WAVE_TRIANGLE, 0.5, 4.0),
 		"miss": _blip(220.0, 0.12, Synth.WAVE_SAW, 0.5, -6.0),
-		"land": _blip(150.0, 0.05, Synth.WAVE_SINE, 0.5, -10.0),
 		"death": _blip(300.0, 0.55, Synth.WAVE_SAW, 0.5, -30.0),
 		# Menu feedback. Quiet and short: navigation should feel mechanical,
 		# not announce itself.

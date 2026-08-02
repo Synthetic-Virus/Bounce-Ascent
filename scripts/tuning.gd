@@ -282,13 +282,54 @@ static func gravity_for_tempo(
 ## `gravity` is explicit rather than read from a constant because it must match
 ## what the simulation actually applies; a mismatch puts every landing off the
 ## beat by a fixed amount.
+## The timestep the arcs are actually simulated at.
+##
+## Not a constant, because project.godot owns the tick rate and two copies of
+## that number would eventually disagree.
+static func physics_step() -> float:
+	return 1.0 / float(Engine.physics_ticks_per_second)
+
+
+## Launch velocity that lands `rise` pixels up after exactly `flight_time`.
+##
+## SOLVED AGAINST THE DISCRETE INTEGRATOR, not the continuous equation, which is
+## what removes the landing bias.
+##
+## The textbook answer is (rise + g*t^2/2) / t. That is correct for continuous
+## motion and slightly wrong for a game, because Godot integrates with
+## semi-implicit Euler at a fixed step h:
+##
+##     v <- v - g*h          then     y <- y + v*h        (NEW v, not the old)
+##
+## Summing n = t/h of those gives y_n = n*h*v0 - g*h^2*n(n+1)/2, whereas the
+## continuous curve gives v0*t - g*t^2/2. Subtracting, the simulated arc sits a
+## constant
+##
+##     g*h*t/2
+##
+## BELOW the ideal one at every t. On the way down, being low means crossing the
+## landing height early, so every landing arrives slightly ahead of its beat.
+##
+## At 128 BPM that is 6.9px of shortfall against a 624px/s descent, i.e. 11ms
+## early, which is exactly the bias gameplay_test.gd was measuring. It was
+## always a systematic offset rather than noise, which is why no amount of
+## smoothing would have removed it.
+##
+## Carrying the h term through the algebra gives the discrete solution:
+##
+##     v0 = (rise + g*t*(t + h) / 2) / t
+##
+## i.e. the same formula with t^2 replaced by t*(t+h). One extra term, derived
+## rather than tuned, so it stays correct if the tick rate ever changes.
 static func solve_launch_velocity(
-	rise: float, flight_time: float, gravity: float = GRAVITY
+	rise: float, flight_time: float, gravity: float = GRAVITY,
+	step: float = -1.0
 ) -> float:
 	if flight_time <= 0.0:
 		push_error("Tuning.solve_launch_velocity: flight_time must be positive")
 		return 0.0
-	return (rise + 0.5 * gravity * flight_time * flight_time) / flight_time
+	var h := physics_step() if step < 0.0 else step
+	return (rise + 0.5 * gravity * flight_time * (flight_time + h)) / flight_time
 
 
 static func apex_height(launch_velocity: float, gravity: float = GRAVITY) -> float:

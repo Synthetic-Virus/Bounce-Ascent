@@ -61,21 +61,49 @@ func check_near(actual: float, expected: float, tolerance: float, what: String) 
 
 # --- Jump physics -----------------------------------------------------------
 
-## The solver must be the exact inverse of the projectile equation.
+## The solver must invert the integrator the game ACTUALLY runs.
+##
+## This used to assert against the continuous projectile equation
+## dy = v0*t - g*t^2/2. That equation is not what Godot executes, and the gap
+## between them was the source of the systematic 11ms early landing bias: the
+## engine uses semi-implicit Euler, whose trajectory sits g*h*t/2 below the
+## continuous curve at every t.
+##
+## So the check now SIMULATES the integrator instead of trusting an
+## idealisation. A test that agrees with the maths while the game disagrees with
+## both is worse than no test, because it actively certifies the bug.
 func test_launch_velocity_analytic() -> void:
-	print("- launch velocity (analytic)")
+	print("- launch velocity (against the real integrator)")
+	var h := Tuning.physics_step()
+
+	# Flight times deliberately chosen as exact multiples of the physics step,
+	# so the comparison is exact rather than carrying a partial final step.
+	# Real flight times are beat-derived and rarely land on a step boundary,
+	# which is why landing detection carries up to one tick of jitter no matter
+	# how good this solver is (see project.godot's physics notes). That residual
+	# is measured against real physics by gameplay_test.gd, not here.
+	#
 	# Loop variables over an untyped array literal are Variant, so every local
 	# derived from them needs an explicit type annotation rather than `:=`.
 	for rise_value in [190.0, 380.0, 95.0]:
 		var rise: float = rise_value
-		for flight_value in [0.5, 0.9375, 1.4]:
+		for flight_value in [0.5, 1.0, 1.5]:
 			var flight: float = flight_value
 			var g: float = Tuning.gravity_for_flight(flight)
 			var v0: float = Tuning.solve_launch_velocity(rise, flight, g)
-			# dy = v0*t - 0.5*g*t^2 must equal the requested rise.
-			var dy: float = v0 * flight - 0.5 * g * flight * flight
-			check_near(dy, rise, 0.001,
-				"analytic rise=%.0f flight=%.4f" % [rise, flight])
+
+			# Step exactly as Godot does: advance velocity FIRST, then move by
+			# the new velocity. Using the old velocity here would be explicit
+			# Euler and would reintroduce the bias this test exists to catch.
+			var steps := int(round(flight / h))
+			var v := v0
+			var y := 0.0
+			for _i in steps:
+				v -= g * h
+				y += v * h
+
+			check_near(y, rise, 0.001,
+				"simulated rise=%.0f flight=%.4f (%d steps)" % [rise, flight, steps])
 
 
 ## The solver is analytic, but the game integrates with semi-implicit Euler at a
