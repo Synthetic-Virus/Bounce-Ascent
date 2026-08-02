@@ -50,9 +50,26 @@ with one of its own, along the lines of
 metadata and cannot mismatch your Apple ID later. Using your real Apple ID
 address anyway just makes the file self-documenting when you renew in a year.
 
-`ios_distribution.key` is your private key. It never leaves your machine and
-Apple never sees it. **If you lose it the certificate becomes useless** and you
-have to revoke and start again, so keep it somewhere you back up.
+Confirm **both** files exist before going any further:
+
+```bash
+ls -l ios_distribution.key ios_distribution.csr
+```
+
+`ios_distribution.key` is your private key, and it is the one irreplaceable
+thing in this entire document.
+
+A certificate is only half of a keypair. Apple signs a statement about your
+*public* key; the private key never leaves your machine and Apple has never had
+a copy. So a certificate whose key you have lost can sign nothing, and there is
+no recovery path through Apple support, only revoke and start over. **Back it
+up, and do not tidy it away as an intermediate file.** It looks like scratch
+output sitting next to the `.csr` you are about to upload, and it is not: the
+`.csr` is the disposable half.
+
+This has already happened once on this project. The `.csr` survived a cleanup
+and the `.key` did not, which killed a freshly issued certificate and a
+provisioning profile with it.
 
 ---
 
@@ -109,11 +126,22 @@ about a year out. If it errors, the `.p12` is wrong and CI will fail too.
 ## 4. Register the App ID
 
 **Identifiers → `+` → App IDs → App.** The bundle ID must match what the build
-already uses, and it is baked into every build produced so far:
+already uses, and it is baked into every build produced so far. Type **exactly**
+this and nothing else:
 
 ```
 org.virusgaming.bounceascent
 ```
+
+**Do not type your Team ID into that field.** Apple's form shows the Team ID as
+a separate greyed-out prefix, so the full identifier becomes
+`TEAMID.org.virusgaming.bounceascent` on its own. Entering the Team ID again in
+the editable half produces `TEAMID.org.virusgaming.bounceascent.TEAMID`, which
+looks plausible in the portal listing and then fails at signing time as a
+profile/bundle-ID mismatch. That happened on the first attempt at this project
+and cost an App ID and a provisioning profile.
+
+App IDs cannot be renamed. A wrong one has to be deleted and recreated.
 
 Leave every capability unchecked. The game uses none of them, and each one you
 enable becomes something Apple expects to see justified.
@@ -136,6 +164,37 @@ step 4 and the certificate from step 2, then download the
 Ad Hoc profiles only install on device UDIDs you have registered in the portal
 beforehand, and adding a device later means regenerating the profile. That
 limitation is the main reason TestFlight exists.
+
+### Check the profile before trusting it
+
+A provisioning profile is a signed plist, so it can be read rather than assumed.
+This is worth thirty seconds because both of the mistakes above are visible in
+it, and neither is visible in the portal's own listing:
+
+```bash
+cd ~/apple-signing
+openssl smime -inform der -verify -noverify -in *.mobileprovision 2>/dev/null > profile.plist
+
+python3 -c "
+import plistlib, hashlib
+d = plistlib.load(open('profile.plist','rb'))
+print('app id  :', d['Entitlements']['application-identifier'])
+print('expires :', d['ExpirationDate'])
+print('certs   :', [hashlib.sha1(c).hexdigest() for c in d['DeveloperCertificates']])
+"
+sha1sum *.cer
+```
+
+Two things to confirm:
+
+- the app id is `TEAMID.org.virusgaming.bounceascent` with **no trailing Team
+  ID**, which catches the App ID mistake
+- the certificate sha1 listed in the profile **matches** the `.cer` you are
+  about to build the `.p12` from, which catches a profile built against a
+  different or since-revoked certificate
+
+A profile embeds the certificates it authorises, so replacing a certificate
+always means regenerating every profile that referenced it.
 
 ---
 
