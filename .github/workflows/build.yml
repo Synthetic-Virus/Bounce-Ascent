@@ -252,16 +252,34 @@ jobs:
           echo "$PROFILE" | base64 --decode \
             > "$HOME/Library/MobileDevice/Provisioning Profiles/build.mobileprovision"
 
-      - name: Apply the real Team ID
+      - name: Apply signing settings to the preset
         if: steps.signing.outputs.enabled == 'true'
         env:
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
+          PROFILE="$HOME/Library/MobileDevice/Provisioning Profiles/build.mobileprovision"
+
+          # The UUID is read from the profile that was just installed rather
+          # than committed, so regenerating a profile needs no repo edit.
+          UUID="$(security cms -D -i "$PROFILE" | plutil -extract UUID raw -)"
+          echo "Provisioning profile UUID: $UUID"
+
           # The preset ships a placeholder so the unsigned export validates.
-          sed -i '' "s/application\/app_store_team_id=\".*\"/application\/app_store_team_id=\"$TEAM\"/" export_presets.cfg
-          sed -i '' 's/application\/export_project_only=true/application\/export_project_only=false/' export_presets.cfg
-          grep -E "app_store_team_id|export_project_only" export_presets.cfg
+          sed -i '' "s|application/app_store_team_id=\".*\"|application/app_store_team_id=\"$TEAM\"|" export_presets.cfg
+          sed -i '' 's|application/export_project_only=true|application/export_project_only=false|' export_presets.cfg
+
+          # Switch Godot from automatic to MANUAL signing.
+          #
+          # Automatic style plus an explicit "Apple Distribution" identity is a
+          # combination Xcode refuses ("automatically signed for development,
+          # but a conflicting code signing identity has been manually
+          # specified"), and it is what Godot emits by default. Setting the
+          # profile UUID is what makes it write manual signing instead.
+          sed -i '' "s|application/provisioning_profile_uuid_release=\".*\"|application/provisioning_profile_uuid_release=\"$UUID\"|" export_presets.cfg
+          sed -i '' "s|application/code_sign_identity_release=\".*\"|application/code_sign_identity_release=\"Apple Distribution\"|" export_presets.cfg
+
+          grep -E "app_store_team_id|export_project_only|code_sign_identity_release|provisioning_profile_uuid_release|export_method_release" export_presets.cfg
 
       # A build number App Store Connect has never seen.
       #
@@ -289,7 +307,28 @@ jobs:
           mkdir -p build/ios
           ~/godot/Godot.app/Contents/MacOS/Godot --headless --path . \
             --export-release "iOS" build/ios/BounceAscent.xcodeproj
-          ls -laR build/ios | head -40
+
+          echo "=== what the export produced ==="
+          find build/ios -maxdepth 2 -not -path '*/BounceAscent.xcodeproj/*' | head -30
+          echo "=== any .ipa anywhere under build ==="
+          find build -name '*.ipa' -exec ls -la {} \; || true
+
+      # Fail here rather than three steps later at the upload.
+      #
+      # A signed run whose archive silently produced nothing would otherwise
+      # sail past, upload an empty artifact, and only surface as a confusing
+      # "no .ipa found" during the TestFlight step.
+      - name: Confirm the signed build produced an .ipa
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          if ! find build -name '*.ipa' | grep -q .; then
+            echo "Signing was enabled but no .ipa was produced."
+            echo "Full tree under build/:"
+            find build -maxdepth 3
+            exit 1
+          fi
+          find build -name '*.ipa' -exec shasum -a 256 {} \;
 
       # Build an INSTALLABLE .ipa even with no Apple account.
       #
