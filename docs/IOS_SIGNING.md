@@ -39,8 +39,16 @@ mkdir -p ~/apple-signing && cd ~/apple-signing
 openssl req -new -newkey rsa:2048 -nodes \
   -keyout ios_distribution.key \
   -out ios_distribution.csr \
-  -subj "/emailAddress=andrew@virusgaming.org/CN=Andrew Alexander/C=US"
+  -subj "/emailAddress=YOUR_APPLE_ID_EMAIL/CN=YOUR NAME/C=US"
 ```
+
+**The subject fields do not have to match anything.** You are not authenticated
+by them: you are authenticated by being signed in to developer.apple.com when
+you upload the request. Apple discards this subject and issues the certificate
+with one of its own, along the lines of
+`CN = Apple Distribution: Your Name (TEAMID)`. So the email here is inert
+metadata and cannot mismatch your Apple ID later. Using your real Apple ID
+address anyway just makes the file self-documenting when you renew in a year.
 
 `ios_distribution.key` is your private key. It never leaves your machine and
 Apple never sees it. **If you lose it the certificate becomes useless** and you
