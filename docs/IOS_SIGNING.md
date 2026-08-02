@@ -1,152 +1,197 @@
-# Turning on iOS signing
+# iOS signing
 
 CI already builds iOS. Without signing secrets it produces an **unsigned `.ipa`
-plus the Xcode project**; with them it produces a **signed `.ipa`**. The
-workflow detects which case it is on its own, so **no code changes are needed**
-when your Apple Developer enrolment completes. Add four repository secrets and
-push.
+plus the Xcode project**; with them it produces a **signed `.ipa`**. The workflow
+detects which case it is on its own, so **no code change** is needed to switch.
+Add four repository secrets and push.
+
+> **You do not need a Mac.** Every step below runs in WSL. Apple's own
+> documentation assumes Keychain Access, and an earlier version of this file
+> repeated that assumption, which made it impossible to follow on this machine.
+> A Certificate Signing Request is a standard PKCS#10 file, not an Apple format,
+> and OpenSSL produces one Apple accepts.
 
 ---
 
-## Before enrolment: sideloading the unsigned build
+## Sideloading, which still has a place
 
-You do not have to wait for the paid enrolment to get the game onto your own
-iPhone, and you do not need a Mac.
-
-CI produces an artifact called **`ios-unsigned-ipa`** on every run. Download it
-from the Actions tab, or:
+Even with a paid membership, `ios-unsigned-ipa` plus **Sideloadly** remains the
+fastest way to get a build onto your own phone: no App Store Connect, no upload,
+no processing wait. The difference enrolment makes is that the certificate now
+lasts **a year instead of 7 days**.
 
 ```bash
 gh run download -R Synthetic-Virus/Bounce-Ascent -n ios-unsigned-ipa
 ```
 
-That `.ipa` contains a real compiled app but carries no signature, so iOS will
-not install it as-is. **Sideloadly** or **AltStore** solve that: both run on
-Windows, re-sign the `.ipa` with an ordinary Apple ID, and install it to a
-device over USB. You will also need Apple Devices (or iTunes) installed so
-Windows can talk to the phone.
-
-The limits of a free Apple ID:
-
-- the app **stops launching after 7 days** and must be re-signed
-- at most **3** sideloaded apps on the device at once
-- no distribution to anyone else, it is your device only
-
-A **paid** account raises the 7 days to a year, which is the main day-to-day
-difference you will notice after enrolling. For handing builds to other people
-you still want TestFlight, covered at the end of this document.
-
-How the unsigned build is produced, since it is not obvious: Godot stops at the
-Xcode project when it has no signing identity, so the workflow runs `xcodebuild`
-itself with `CODE_SIGNING_ALLOWED=NO`, then packages the resulting `.app` into
-`Payload/` and zips it. That works because signing is applied to the compiled
-app rather than being part of compilation, and because an `.ipa` is only a zip
-with a directory named `Payload` in it.
+Use it for "does this fix work on the device". Use TestFlight when someone else
+needs to play it, because sideloading only ever works for you.
 
 ---
 
-## What you need from Apple
+## 1. Generate a key and a certificate request
 
-Once the enrolment is approved, at
-[developer.apple.com/account](https://developer.apple.com/account):
+In WSL, anywhere outside the repo (these are secrets, do not commit them):
 
-**1. Team ID.** Membership details, a ten-character string like `A1B2C3D4E5`.
+```bash
+mkdir -p ~/apple-signing && cd ~/apple-signing
 
-**2. A distribution certificate.** Certificates, Identifiers & Profiles →
-Certificates → `+` → *Apple Distribution*. You upload a Certificate Signing
-Request, which you generate on a Mac in Keychain Access
-(*Certificate Assistant → Request a Certificate From a Certificate Authority*,
-saved to disk). Download the resulting `.cer` and double-click to install it.
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout ios_distribution.key \
+  -out ios_distribution.csr \
+  -subj "/emailAddress=andrew@virusgaming.org/CN=Andrew Alexander/C=US"
+```
 
-**3. An App ID.** Identifiers → `+` → *App IDs* → *App*. The bundle ID must
-match the one already in `export_presets.cfg`:
+`ios_distribution.key` is your private key. It never leaves your machine and
+Apple never sees it. **If you lose it the certificate becomes useless** and you
+have to revoke and start again, so keep it somewhere you back up.
+
+---
+
+## 2. Get the certificate from Apple
+
+At [developer.apple.com/account](https://developer.apple.com/account) →
+Certificates, Identifiers & Profiles:
+
+**Certificates → `+` → Apple Distribution.** Upload `ios_distribution.csr`.
+Download the resulting `ios_distribution.cer`. Move it into `~/apple-signing`.
+
+One Apple Distribution certificate covers both Ad Hoc and App Store builds, so
+you only need this once. It expires after a year.
+
+---
+
+## 3. Combine them into a `.p12`
+
+CI needs the certificate and its private key together, which is what a `.p12`
+is:
+
+```bash
+cd ~/apple-signing
+
+# Apple hands back DER; OpenSSL wants PEM to bundle it.
+openssl x509 -inform DER -in ios_distribution.cer -out ios_distribution.pem
+
+openssl pkcs12 -export -legacy \
+  -inkey ios_distribution.key \
+  -in ios_distribution.pem \
+  -out Certificates.p12 \
+  -name "Apple Distribution" \
+  -passout pass:CHOOSE_A_PASSWORD
+```
+
+**`-legacy` is not optional.** OpenSSL 3, which is the default in Ubuntu 24.04,
+encrypts `.p12` files with AES-256, and macOS `security import` on the CI runner
+frequently refuses those. The failure surfaces as a wrong-password error during
+the "Install certificate" step, which sends you looking in entirely the wrong
+place. `-legacy` emits the older encryption the keychain accepts.
+
+Verify before you go further, so a bad file is caught here rather than in CI:
+
+```bash
+openssl pkcs12 -in Certificates.p12 -legacy -nokeys -passin pass:CHOOSE_A_PASSWORD | \
+  openssl x509 -noout -subject -dates
+```
+
+That should print an `Apple Distribution: ...` subject and a validity window
+about a year out. If it errors, the `.p12` is wrong and CI will fail too.
+
+---
+
+## 4. Register the App ID
+
+**Identifiers → `+` → App IDs → App.** The bundle ID must match what the build
+already uses, and it is baked into every build produced so far:
 
 ```
 org.virusgaming.bounceascent
 ```
 
-Change it in both places if you want a different one.
-
-**4. A provisioning profile.** Profiles → `+`. Pick *Ad Hoc* to install on
-devices you register, or *App Store* to upload to TestFlight. Select the App ID
-and certificate from above, then download the `.mobileprovision`.
+Leave every capability unchecked. The game uses none of them, and each one you
+enable becomes something Apple expects to see justified.
 
 ---
 
-## Exporting the certificate
+## 5. Create a provisioning profile
 
-The certificate is only useful to CI together with its private key, which means
-a `.p12`:
+**Profiles → `+`.** Which type depends on what you are doing:
 
-1. Keychain Access → *My Certificates*
-2. Right-click the *Apple Distribution* certificate → **Export**
-3. Save as `.p12` and set a password (any password; you will store it as a
-   secret)
+| Goal | Profile type |
+|---|---|
+| TestFlight or App Store | **App Store Connect** |
+| Install directly on devices you own | **Ad Hoc** |
+
+For an App Store release, pick **App Store Connect**. Select the App ID from
+step 4 and the certificate from step 2, then download the
+`.mobileprovision` into `~/apple-signing`.
+
+Ad Hoc profiles only install on device UDIDs you have registered in the portal
+beforehand, and adding a device later means regenerating the profile. That
+limitation is the main reason TestFlight exists.
 
 ---
 
-## The four secrets
+## 6. Add the four secrets
 
-Settings → Secrets and variables → Actions → *New repository secret*.
-
-Both binary files go in base64-encoded, because a GitHub secret is text:
+Both binaries go in base64, because a GitHub secret is text. `-w 0` keeps it on
+one line, which matters:
 
 ```bash
-base64 -i Certificates.p12 | pbcopy          # -> APPLE_CERT_P12
-base64 -i BounceAscent.mobileprovision | pbcopy   # -> APPLE_PROVISIONING_PROFILE
+cd ~/apple-signing
+base64 -w 0 Certificates.p12 > p12.b64
+base64 -w 0 *.mobileprovision > profile.b64
 ```
 
-On Linux or WSL use `base64 -w 0 <file>` instead, so the output is a single
-line with no wrapping.
+Then, from the repo:
+
+```bash
+gh secret set APPLE_CERT_P12 -R Synthetic-Virus/Bounce-Ascent < ~/apple-signing/p12.b64
+gh secret set APPLE_PROVISIONING_PROFILE -R Synthetic-Virus/Bounce-Ascent < ~/apple-signing/profile.b64
+gh secret set APPLE_CERT_PASSWORD -R Synthetic-Virus/Bounce-Ascent
+gh secret set APPLE_TEAM_ID -R Synthetic-Virus/Bounce-Ascent
+```
+
+The last two prompt for the value. The Team ID is the ten-character string in
+Membership details.
 
 | Secret | Value |
 |---|---|
-| `APPLE_TEAM_ID` | the ten-character Team ID |
-| `APPLE_CERT_P12` | base64 of the `.p12` |
-| `APPLE_CERT_PASSWORD` | the password you set when exporting the `.p12` |
+| `APPLE_TEAM_ID` | ten-character Team ID |
+| `APPLE_CERT_P12` | base64 of `Certificates.p12` |
+| `APPLE_CERT_PASSWORD` | the password from step 3 |
 | `APPLE_PROVISIONING_PROFILE` | base64 of the `.mobileprovision` |
 
-Push anything, or run the workflow manually from the Actions tab. The iOS job
-log will say `Signing secrets present: producing a signed build.`
+Push anything, or run the workflow from the Actions tab. The iOS log will say
+`Signing secrets present: producing a signed build.` and the artifact will be
+named **`ios-signed-ipa`** instead of `ios-unsigned-ipa`.
 
 ---
 
-## What the workflow does when they exist
+## What the workflow does when the secrets exist
 
 1. Creates a **throwaway keychain** in the runner temp directory and imports the
    certificate into it. The runner's default keychain is never touched.
 2. Installs the provisioning profile.
 3. Rewrites two fields in `export_presets.cfg`: the placeholder Team ID becomes
    the real one, and `export_project_only` flips to `false` so Godot archives
-   through to an `.ipa` instead of stopping at the Xcode project.
+   through to an `.ipa` rather than stopping at the Xcode project.
 4. Exports and uploads the artifact as `ios-signed-ipa`.
 
-Those two preset fields are patched **in CI only**, not committed. The file in
-git stays in its unsigned-friendly state so a contributor without secrets still
+Those preset fields are patched **in CI only**, never committed, so the file in
+git stays in its unsigned-friendly state and a contributor with no secrets still
 gets a working build.
 
 ---
 
-## Notes worth knowing before you spend money
+## Things that will bite you later
 
-- **macOS runners bill at 10x** the Linux minute rate. That is why the iOS job
-  is independent and `continue-on-error`: it never blocks or slows the Windows
-  and Android builds, which run free on Linux.
-- **Certificates expire after a year** and provisioning profiles sooner. When
-  iOS starts failing with a signing error long after it last worked, this is
-  almost always why. Re-export and replace the secrets.
-- **Ad Hoc profiles only install on registered devices.** You must add each
-  device's UDID in the portal and regenerate the profile. For wider testing,
-  use an App Store profile and upload to TestFlight.
-- **TestFlight upload is a further step** beyond producing an `.ipa`: it needs
-  an App Store Connect API key and an `xcrun altool`/`notarytool` call. Say the
-  word once signing works and I will add it.
+- **Certificates expire after a year**, provisioning profiles sooner. When iOS
+  starts failing with a signing error long after it last worked, this is almost
+  always why. Regenerate and replace the secrets. Keep `ios_distribution.key`,
+  because renewal needs it.
+- **The private key is the thing you cannot recover.** Apple can reissue a
+  certificate; nobody can reissue your key.
+- **Do not commit `~/apple-signing`.** It is deliberately outside the repo.
 
----
-
-## Current state
-
-`export_presets.cfg` ships a placeholder Team ID of `0000000000`. Godot
-validates that field and refuses the iOS export outright without it, even for an
-unsigned build, so the placeholder is what lets CI produce anything at all
-before enrolment completes.
+For everything beyond producing a signed build, see
+[APP_STORE_RELEASE.md](APP_STORE_RELEASE.md).

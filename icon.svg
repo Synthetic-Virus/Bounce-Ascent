@@ -1,10 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- Bounce Ascent icon: the player orb mid-hop above a platform. -->
-  <rect width="128" height="128" fill="#080312" rx="18"/>
-  <rect x="26" y="96" width="76" height="10" rx="5" fill="#7b3cff" opacity="0.45"/>
-  <rect x="30" y="97" width="68" height="7" rx="3.5" fill="#b388ff"/>
-  <circle cx="64" cy="52" r="30" fill="#39f2ff" opacity="0.12"/>
-  <circle cx="64" cy="52" r="22" fill="#39f2ff" opacity="0.22"/>
-  <circle cx="64" cy="52" r="15" fill="#5ef6ff"/>
-  <circle cx="64" cy="52" r="6" fill="#ffffff" opacity="0.92"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Bounce Ascent app icon: the player orb mid-hop above a platform.
+
+       SQUARE AND FULLY OPAQUE, deliberately. The background rect covers the
+       whole canvas with no corner radius, because iOS applies its own mask and
+       Apple REJECTS any app icon carrying an alpha channel. The previous
+       version rounded its own corners, which left them transparent and would
+       have failed App Store validation on upload.
+
+       Also drawn much larger. This is read at 60px on a home screen, where the
+       old version's 7px platform and small orb dissolved into the background. -->
+
+  <rect width="1024" height="1024" fill="#080312"/>
+
+  <!-- Ascent trail: fading ghosts of the orb, so the icon reads as "climb"
+       rather than "ball". -->
+  <circle cx="512" cy="800" r="46" fill="#5ef6ff" opacity="0.10"/>
+  <circle cx="512" cy="690" r="60" fill="#5ef6ff" opacity="0.16"/>
+
+  <!-- Platform, in the violet the game uses for platforms. -->
+  <rect x="236" y="836" width="552" height="58" rx="29" fill="#7b3cff" opacity="0.45"/>
+  <rect x="264" y="846" width="496" height="38" rx="19" fill="#b388ff"/>
+
+  <!-- The orb and its glow. -->
+  <circle cx="512" cy="452" r="300" fill="#39f2ff" opacity="0.07"/>
+  <circle cx="512" cy="452" r="222" fill="#39f2ff" opacity="0.13"/>
+  <circle cx="512" cy="452" r="156" fill="#5ef6ff"/>
+  <circle cx="470" cy="410" r="52" fill="#ffffff" opacity="0.90"/>
 </svg>

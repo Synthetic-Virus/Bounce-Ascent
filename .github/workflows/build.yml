@@ -21,6 +21,19 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      upload_testflight:
+        description: "Upload the signed build to TestFlight"
+        type: boolean
+        default: false
+
+# TestFlight upload is deliberately MANUAL and never runs on a push.
+#
+# Uploading is outward facing and irreversible in the sense that a build number
+# is consumed forever: App Store Connect rejects a rebuild carrying a number it
+# has already seen. Firing on every commit would burn numbers, spam testers with
+# notifications and publish work in progress. Run the workflow by hand from the
+# Actions tab and tick the box when a build is actually meant to go out.
 
 env:
   # Standard (non-.NET) Godot: the project uses no C#, and the standard
@@ -250,6 +263,20 @@ jobs:
           sed -i '' 's/application\/export_project_only=true/application\/export_project_only=false/' export_presets.cfg
           grep -E "app_store_team_id|export_project_only" export_presets.cfg
 
+      # A build number App Store Connect has never seen.
+      #
+      # CFBundleVersion must be unique per upload for a given CFBundleShortVersion,
+      # and a rejected duplicate wastes a whole round trip. run_number is
+      # monotonic per repository and never repeats, so it is a safe source.
+      # CFBundleShortVersion (the user-visible "2.0.0") is deliberately left
+      # alone: that is a release decision, not a CI one.
+      - name: Stamp a unique build number
+        if: inputs.upload_testflight
+        run: |
+          set -euo pipefail
+          sed -i '' "s/application\/version=\".*\"/application\/version=\"${{ github.run_number }}\"/" export_presets.cfg
+          grep -E "application/(short_)?version" export_presets.cfg
+
       - name: Import project
         run: |
           ~/godot/Godot.app/Contents/MacOS/Godot --headless --import --path . || true
@@ -336,3 +363,69 @@ jobs:
             !build/ios/dd
             !build/ios/Payload
           retention-days: 30
+
+      # --- TestFlight -------------------------------------------------------
+      #
+      # Only when explicitly asked for AND the build is actually signed. An
+      # unsigned .ipa cannot be uploaded, so requesting it without signing
+      # secrets is a mistake worth failing loudly rather than skipping quietly.
+      #
+      # Needs three MORE secrets beyond the four signing ones, from App Store
+      # Connect -> Users and Access -> Integrations -> App Store Connect API:
+      #   APPSTORE_ISSUER_ID    the issuer UUID shown above the key list
+      #   APPSTORE_KEY_ID       the ten-character key ID
+      #   APPSTORE_PRIVATE_KEY  base64 of the .p8, which downloads ONCE and
+      #                         cannot be downloaded again
+      - name: Upload to TestFlight
+        if: inputs.upload_testflight
+        env:
+          ISSUER: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          SIGNED: ${{ steps.signing.outputs.enabled }}
+        run: |
+          set -euo pipefail
+
+          if [ "$SIGNED" != "true" ]; then
+            echo "Upload requested but this build is UNSIGNED."
+            echo "TestFlight only accepts signed builds. See docs/IOS_SIGNING.md."
+            exit 1
+          fi
+          if [ -z "$ISSUER" ] || [ -z "$KEY_ID" ] || [ -z "$PRIVATE_KEY" ]; then
+            echo "Upload requested but App Store Connect secrets are missing."
+            echo "Need APPSTORE_ISSUER_ID, APPSTORE_KEY_ID, APPSTORE_PRIVATE_KEY."
+            exit 1
+          fi
+
+          # altool finds the key by convention, not by argument: it looks for
+          # AuthKey_<KEY_ID>.p8 in ~/private_keys. There is no flag to point it
+          # somewhere else, so the filename has to be exactly this.
+          mkdir -p ~/private_keys
+          echo "$PRIVATE_KEY" | base64 --decode > ~/private_keys/AuthKey_${KEY_ID}.p8
+          chmod 600 ~/private_keys/AuthKey_${KEY_ID}.p8
+
+          IPA="$(find build/ios -name '*.ipa' -print -quit)"
+          if [ -z "$IPA" ]; then
+            echo "No .ipa found to upload. Contents of build/ios:"
+            find build/ios -maxdepth 2
+            exit 1
+          fi
+          echo "Uploading $IPA"
+
+          # Validate BEFORE uploading. Validation is free and repeatable; an
+          # upload consumes the build number permanently, so a preventable
+          # rejection here would cost a whole round trip.
+          xcrun altool --validate-app -f "$IPA" -t ios \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+          echo "Uploaded. Processing in App Store Connect takes a few minutes."
+
+      - name: Remove the App Store Connect key
+        # always(), so a failed upload does not leave a private key on the
+        # runner. Ephemeral runners make this belt and braces, but a key that
+        # cannot be re-downloaded deserves both.
+        if: always() && inputs.upload_testflight
+        run: rm -rf ~/private_keys
