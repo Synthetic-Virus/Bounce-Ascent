@@ -411,12 +411,25 @@ static func score_for(judgement: int) -> int:
 		_: return SCORE_MISS
 
 
-static func judgement_label(judgement: int) -> String:
+## The word shown for a judgement.
+##
+## The bottom tier says "LATE" or "EARLY", not "MISS".
+##
+## Deliberate, and borrowed: Beatstar softens its bottom tier for a reason, and
+## its bottom tier is still called "Great". The player did not miss anything
+## here. They landed, they climbed a tier, they kept going; they were simply off
+## the beat. Calling that a MISS, in red, four times a run, tells a new player
+## they are failing at a game they are actually playing.
+##
+## "LATE" and "EARLY" also carry information "MISS" does not: they say which way
+## to correct. The millisecond figure underneath is for the player who wants
+## precision; the word is for everyone else. See docs/DESIGN_RESEARCH.md.
+static func judgement_label(judgement: int, error: float = 0.0) -> String:
 	match judgement:
 		Judgement.PERFECT: return "PERFECT"
 		Judgement.GREAT: return "GREAT"
 		Judgement.GOOD: return "GOOD"
-		_: return "MISS"
+		_: return "LATE" if error > 0.0 else "EARLY"
 
 
 static func judgement_color(judgement: int) -> Color:

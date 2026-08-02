@@ -23,6 +23,7 @@ func _ready() -> void:
 
 	test_launch_velocity_analytic()
 	test_tilt_response()
+	test_judgement_labels()
 	test_launch_velocity_numeric()
 	test_arc_tier_separation()
 	test_difficulty_curve()
@@ -61,6 +62,37 @@ func check_near(actual: float, expected: float, tolerance: float, what: String) 
 
 
 # --- Jump physics -----------------------------------------------------------
+
+## The bottom judgement tier names the direction rather than announcing failure.
+##
+## Beatstar's bottom tier is still called "Great"; softening the bottom tier is a
+## deliberate, evidenced choice rather than a cosmetic one. Here the player has
+## not missed anything: they landed, climbed a tier and kept going, they were
+## just off the beat. LATE and EARLY also say which way to correct, which "MISS"
+## does not. See docs/DESIGN_RESEARCH.md.
+func test_judgement_labels() -> void:
+	print("- judgement labels")
+
+	check(Tuning.judgement_label(Tuning.Judgement.PERFECT) == "PERFECT",
+		"the top tier is still named for the achievement")
+	check(Tuning.judgement_label(Tuning.Judgement.GREAT) == "GREAT", "GREAT")
+	check(Tuning.judgement_label(Tuning.Judgement.GOOD) == "GOOD", "GOOD")
+
+	# Sign convention: positive error is late. Getting this backwards would tell
+	# every player to correct in exactly the wrong direction.
+	check(Tuning.judgement_label(Tuning.Judgement.MISS, 0.20) == "LATE",
+		"a positive error reads as LATE")
+	check(Tuning.judgement_label(Tuning.Judgement.MISS, -0.20) == "EARLY",
+		"a negative error reads as EARLY")
+
+	var labels: Array[String] = []
+	for j in [Tuning.Judgement.PERFECT, Tuning.Judgement.GREAT,
+			Tuning.Judgement.GOOD, Tuning.Judgement.MISS]:
+		labels.append(Tuning.judgement_label(j, 0.1))
+	check(not labels.has("MISS"),
+		"nothing in the game calls the player's landing a MISS")
+	print("    tiers read as: %s" % ", ".join(labels))
+
 
 ## REGRESSION: tilt steering was an on/off switch, not a control.
 ##

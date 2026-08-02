@@ -36,6 +36,16 @@ var _pause_button: Button
 ## Top safe-area inset, cached at build time.
 var _top_inset: float = 0.0
 
+## Lead over the death line in tiers: a fast reading for the number, a slow one
+## to difference against, and the resulting trend. Negative until the first tick
+## so the first frame does not animate up from zero.
+var _lead_shown: float = -1.0
+var _lead_slow: float = -1.0
+var _lead_trend: float = 0.0
+
+## Seconds remaining on the "+1" flourish that fires when a PERFECT is landed.
+var _lead_gain_flash: float = 0.0
+
 
 ## The block the height readout occupies, drawn text and all.
 ##
@@ -150,6 +160,7 @@ func _build_pause_actions() -> void:
 
 func _process(delta: float) -> void:
 	_popup_age += delta
+	_lead_gain_flash = maxf(_lead_gain_flash - delta * 1.4, 0.0)
 	_shown_score = move_toward(_shown_score, float(_score),
 		maxf(900.0, absf(float(_score) - _shown_score) * 6.0) * delta)
 	_canvas.queue_redraw()
@@ -199,7 +210,58 @@ func _draw_hud() -> void:
 		_draw_countdown(display, w, h, pulse)
 		return
 
+	_draw_lead(data, top)
 	_draw_judgement(display, data, w, pulse)
+
+
+## LEAD: how far ahead of the death line the player is, and which way it is going.
+##
+## The single most important readout in the game after the judgement itself, and
+## it did not exist. A PERFECT climbs two tiers in the time an ordinary hop
+## climbs one, so timing well pushes the line away and ordinary timing eventually
+## does not. That is the entire skill proposition, and it was invisible: the
+## player saw a red wash arrive and a run end, with no way to connect either to
+## anything they did.
+##
+## Doodle Jump gets this for free, because you die by missing a platform and the
+## cause is self-evident. A rising line has to explain itself or it reads as a
+## timer running out. See docs/DESIGN_RESEARCH.md.
+func _draw_lead(data: Font, top: float) -> void:
+	if _lead_shown < 0.0:
+		return
+
+	var tiers := maxi(int(round(_lead_shown)), 0)
+
+	# Colour IS the message: gaining ground is cyan, holding is dim, losing is
+	# red. A player who never reads the word still learns that red means their
+	# timing has stopped being good enough.
+	var col := UIKit.DIM
+	var word := "holding"
+	if _lead_trend > 0.12:
+		col = UIKit.CYAN
+		word = "gaining"
+	elif _lead_trend < -0.12:
+		col = UIKit.RED
+		word = "losing"
+
+	var y := 116.0 + top
+	var x := UIKit.MARGIN
+
+	_canvas.draw_string(data, Vector2(x, y), "LEAD",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.DIM)
+	_canvas.draw_string(data, Vector2(x + 44.0, y), "%d" % tiers,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)
+	_canvas.draw_string(data, Vector2(x + 82.0, y), word,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
+
+	# The flourish that closes the causal loop: a PERFECT bought an extra tier,
+	# so say so, here, where the consequence is displayed. The judgement popup
+	# already says the timing was good; this says what the timing was FOR.
+	if _lead_gain_flash > 0.0:
+		var rise := (1.0 - _lead_gain_flash) * 14.0
+		_canvas.draw_string(data, Vector2(x + 150.0, y - rise), "+1",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 18,
+			Color(UIKit.GOLD.r, UIKit.GOLD.g, UIKit.GOLD.b, _lead_gain_flash))
 
 
 ## Judgement and combo as one group, so the player reads a single thing.
@@ -213,7 +275,7 @@ func _draw_judgement(display: Font, data: Font, w: float, pulse: float) -> void:
 
 	var y := UIKit.screen_height() * 0.26
 	var col := Tuning.judgement_color(_judgement)
-	var label := Tuning.judgement_label(_judgement)
+	var label := Tuning.judgement_label(_judgement, _judgement_error)
 	if _judgement_tiers >= Tuning.PERFECT_TIER_SKIP:
 		label += "  x2"
 
@@ -221,12 +283,17 @@ func _draw_judgement(display: Font, data: Font, w: float, pulse: float) -> void:
 		HORIZONTAL_ALIGNMENT_CENTER, w, 54,
 		Color(col.r, col.g, col.b, alpha))
 
-	# Which WAY you were wrong, which is the actionable part.
+	# How far off, which is the actionable part.
+	#
+	# The direction used to be repeated here as well as being obvious from the
+	# error sign, and now the bottom tier's own label says LATE or EARLY, so
+	# printing it twice would be three statements of one fact stacked vertically.
 	if _judgement != Tuning.Judgement.PERFECT:
-		var ms := int(round(_judgement_error * 1000.0))
-		var dir := "LATE" if ms > 0 else "EARLY"
-		_canvas.draw_string(data, Vector2(0.0, y + 32.0),
-			"%d ms %s" % [absi(ms), dir],
+		var ms := absi(int(round(_judgement_error * 1000.0)))
+		var detail := "%d ms" % ms
+		if _judgement != Tuning.Judgement.MISS:
+			detail = "%d ms %s" % [ms, "late" if _judgement_error > 0.0 else "early"]
+		_canvas.draw_string(data, Vector2(0.0, y + 32.0), detail,
 			HORIZONTAL_ALIGNMENT_CENTER, w, 20,
 			Color(UIKit.DIM.r, UIKit.DIM.g, UIKit.DIM.b, alpha))
 
@@ -280,6 +347,10 @@ func on_run_started(song: Dictionary) -> void:
 	_danger = 0.0
 	_judgement = -1
 	_countdown = -1
+	_lead_shown = -1.0
+	_lead_slow = -1.0
+	_lead_trend = 0.0
+	_lead_gain_flash = 0.0
 	_pause_panel.visible = false
 
 
@@ -303,11 +374,37 @@ func on_tick(
 	if not Settings.flash_effects:
 		_danger *= 0.4
 
+	# Lead over the death line, in tiers, and which way it is moving.
+	#
+	# This is the game's central cause-and-effect made visible. A PERFECT climbs
+	# two tiers in the time an ordinary hop climbs one, so timing well pushes the
+	# line away and timing ordinarily eventually does not. That relationship was
+	# real but invisible: it existed only in the physics and in one line of a
+	# text screen, so a death read as a timer expiring rather than as a
+	# consequence.
+	#
+	# Smoothed, because the raw gap oscillates by most of a tier over every
+	# single hop as the player rises and falls. An indicator that flickers
+	# between gaining and losing twice a second teaches nothing.
+	var lead := (death_y - player_y) / Tuning.TIER_RISE
+	if _lead_shown < 0.0:
+		_lead_shown = lead
+		_lead_slow = lead
+	_lead_shown = lerpf(_lead_shown, lead, 0.18)
+	_lead_slow = lerpf(_lead_slow, lead, 0.02)
+	_lead_trend = _lead_shown - _lead_slow
+
 
 func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 	_judgement = judgement
 	_judgement_error = error
 	_judgement_tiers = tiers
+
+	# Fire the flourish on the LEAD readout, not just the judgement popup. The
+	# popup says "you timed well"; this says "and here is what it bought you",
+	# which is the half the player could not previously see.
+	if tiers >= Tuning.PERFECT_TIER_SKIP:
+		_lead_gain_flash = 0.9
 	_popup_age = 0.0
 
 
