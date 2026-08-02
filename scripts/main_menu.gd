@@ -27,6 +27,7 @@ var _volume: HSlider
 var _volume_value: Label
 var _flash: Button
 var _shake: Button
+var _haptics: Button
 var _steering: Button
 var _calibrate: Button
 var _status: Label
@@ -186,6 +187,14 @@ func _build_settings(col: VBoxContainer) -> void:
 	_shake.pressed.connect(_toggle_shake)
 	col.add_child(_shake)
 
+	# Hidden rather than omitted on desktop, so _refresh does not need to know
+	# whether the control exists. A hidden child takes no space in a VBox.
+	_haptics = UIKit.button("", UIKit.CYAN, 20)
+	_haptics.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	_haptics.visible = OS.has_feature("mobile")
+	_haptics.pressed.connect(_toggle_haptics)
+	col.add_child(_haptics)
+
 	col.add_child(_spacer(20))
 	var back := UIKit.button("Done", UIKit.GOLD, 26, true)
 	back.custom_minimum_size = Vector2(0, Tuning.TOUCH_PRIMARY)
@@ -332,6 +341,13 @@ func _toggle_shake() -> void:
 	_refresh()
 
 
+func _toggle_haptics() -> void:
+	Settings.haptics = not Settings.haptics
+	Settings.save_settings()
+	Music.play_sfx("ui_move")
+	_refresh()
+
+
 func _toggle_steering() -> void:
 	Settings.tilt_steering = not Settings.tilt_steering
 	Settings.save_settings()
@@ -395,6 +411,7 @@ func _refresh() -> void:
 
 	_flash.text = "Flash effects   %s" % ("on" if Settings.flash_effects else "off")
 	_shake.text = "Screen shake    %s" % ("on" if Settings.screen_shake else "off")
+	_haptics.text = "Vibration       %s" % ("on" if Settings.haptics else "off")
 	_steering.text = "Steering   %s" % (
 		"tilt the device" if Settings.tilt_steering else "on-screen pads")
 	_volume_value.text = "%d%%" % int(round(Settings.master_volume * 100.0))

@@ -80,15 +80,44 @@ static var _display: Font
 static var _data: Font
 
 
+## Condensed grotesque for headings and primary actions.
+##
+## The Apple entries are not optional garnish. The list used to be Bahnschrift,
+## Segoe UI Semibold, Arial Narrow, every one of which is a WINDOWS face, so on
+## iOS none resolved and headings dropped to Godot's generic built-in. The list
+## was ordered for the machine it was written on: Windows matches on entry one,
+## so the rest was never exercised during development.
+##
+## Avenir Next Condensed comes before SF Pro deliberately. SF is the more
+## "native" answer, but this is a game and its display face should have some
+## character; Avenir Next Condensed is also far closer to Bahnschrift's
+## proportions, so the layout keeps the same rhythm across platforms.
 static func display_font() -> Font:
 	if _display == null:
-		_display = _system(["Bahnschrift", "Segoe UI Semibold", "Arial Narrow"])
+		_display = _system([
+			"Bahnschrift", "Segoe UI Semibold",          # Windows
+			"Avenir Next Condensed", "SF Pro Display",   # iOS / macOS
+			"Arial Narrow", "DejaVu Sans",               # last resort
+		])
 	return _display
 
 
+## Monospace for body copy, data and most buttons.
+##
+## Monospace is load-bearing, not decoration: the track rows are laid out with
+## printf padding ("%-13s"), which only lines up in a fixed-pitch face.
+##
+## Menlo is the important addition. Courier New was previously the ONLY name in
+## this list that exists on iOS, so every non-primary button on the phone was
+## rendering in a 1955 typewriter face, which is most of what made the menus
+## look foreign.
 static func data_font() -> Font:
 	if _data == null:
-		_data = _system(["Consolas", "Cascadia Mono", "Courier New"])
+		_data = _system([
+			"Consolas", "Cascadia Mono",                 # Windows
+			"SF Mono", "Menlo",                          # iOS / macOS
+			"Courier New", "DejaVu Sans Mono",           # last resort
+		])
 	return _data
 
 
@@ -186,8 +215,32 @@ static func outline(label: Label, size: int = 5) -> Label:
 # --- Widgets ----------------------------------------------------------------
 
 ## A filled panel style with a neon border.
+## A short tap of the vibration motor, for touch feedback on a control.
+##
+## Guarded to mobile because vibrate_handheld does nothing on desktop and there
+## is no reason to ask.
+##
+## Honest about the limits: Godot exposes a duration and amplitude, not the
+## named iOS feedback styles, so this is a coarse buzz rather than a proper
+## Taptic "light impact". Very short durations may be rounded up or ignored
+## depending on the device. It is still much closer to how a phone should feel
+## than silence.
+static func haptic() -> void:
+	if not OS.has_feature("mobile") or not Settings.haptics:
+		return
+	Input.vibrate_handheld(12)
+
+
+## Corner radius for controls.
+##
+## 4px was a desktop-era value and read as a Windows dialog on a phone. Apple's
+## controls sit around 10-14px at this size, and a touch target that is 88-120px
+## tall needs the larger radius simply to look intentional rather than clipped.
+const RADIUS: int = 12
+
+
 static func box(fill: Color, border: Color, width: int = 1,
-		radius: int = 4) -> StyleBoxFlat:
+		radius: int = RADIUS) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = fill
 	s.border_color = border
@@ -219,8 +272,20 @@ static func button(text: String, accent: Color = CYAN, size: int = 22,
 	b.add_theme_stylebox_override("normal", box(fill, accent if primary else PANEL_EDGE, 1))
 	b.add_theme_stylebox_override("hover",
 		box(fill.lightened(0.12) if primary else PANEL.lightened(0.10), accent, 2))
+
+	# Pressed goes BRIGHTER, not darker.
+	#
+	# It used to darken by 15%, which is a mouse-era convention: on a desktop the
+	# cursor never covers the control, so a subtle change is visible. On a phone
+	# your thumb is on top of the button, so the only part still visible is the
+	# rim, and a darkening reads as nothing happening. Lighting up the fill and
+	# thickening the border puts the feedback where it can still be seen.
 	b.add_theme_stylebox_override("pressed",
-		box(fill.darkened(0.15), accent, 2))
+		box(fill.lightened(0.28) if primary else PANEL.lightened(0.30), accent, 3))
+	# Haptic on button_down rather than pressed: button_down fires the instant
+	# the finger lands, and feedback that waits for the release feels detached
+	# from the touch that caused it.
+	b.button_down.connect(haptic)
 	# Focus is a distinct, high-contrast ring: keyboard players must be able to
 	# see where they are without moving a mouse.
 	b.add_theme_stylebox_override("focus", box(Color(0, 0, 0, 0), GOLD, 3))

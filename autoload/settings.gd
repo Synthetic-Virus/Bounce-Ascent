@@ -33,6 +33,11 @@ var sfx_volume: float = 0.6
 var flash_effects: bool = true
 var screen_shake: bool = true
 
+## Vibration on button presses. Grouped with the other two because it is the
+## same kind of setting: a sensory effect some players need to turn off, not a
+## preference about how the game plays. Ignored on desktop.
+var haptics: bool = true
+
 ## Touch steering. On-screen pads are the default; tilt is opt-in.
 ##
 ## Tilt was the original default, on the reasoning that it leaves the whole
@@ -73,6 +78,7 @@ func load_settings() -> void:
 	sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 	flash_effects = cfg.get_value("video", "flash_effects", flash_effects)
 	screen_shake = cfg.get_value("video", "screen_shake", screen_shake)
+	haptics = cfg.get_value("video", "haptics", haptics)
 	last_song_id = cfg.get_value("game", "last_song_id", last_song_id)
 	tilt_steering = cfg.get_value("controls", "tilt_steering", tilt_steering)
 
@@ -100,6 +106,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("video", "flash_effects", flash_effects)
 	cfg.set_value("video", "screen_shake", screen_shake)
+	cfg.set_value("video", "haptics", haptics)
 	cfg.set_value("game", "last_song_id", last_song_id)
 	cfg.set_value("controls", "tilt_steering", tilt_steering)
 	# Marks the tilt migration as done, so a player who deliberately chooses
