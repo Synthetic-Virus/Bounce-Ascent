@@ -87,7 +87,7 @@ func _ready() -> void:
 
 	var ruler := preload("res://scenes/BeatRuler.tscn").instantiate()
 	ruler.position = Vector2(18.0, 0.0)
-	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
+	ruler.size = Vector2(UIKit.RULER_WIDTH, UIKit.screen_height())
 	_canvas.add_child(ruler)
 
 	# Cached rather than sampled per frame: it cannot change during a run, and
@@ -121,7 +121,7 @@ func _ready() -> void:
 ## Buttons on the pause screen, for the same reason the pause control exists.
 func _build_pause_actions() -> void:
 	var col := VBoxContainer.new()
-	col.position = Vector2(UIKit.MARGIN, Tuning.PLAYFIELD_HEIGHT * 0.52)
+	col.position = Vector2(UIKit.MARGIN, UIKit.screen_height() * 0.52)
 	col.size = Vector2(Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0, 300.0)
 	col.add_theme_constant_override("separation", 12)
 	col.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -160,8 +160,12 @@ func _process(delta: float) -> void:
 # --- Drawing ----------------------------------------------------------------
 
 func _draw_hud() -> void:
-	var w := Tuning.PLAYFIELD_WIDTH
-	var h := Tuning.PLAYFIELD_HEIGHT
+	# Real viewport, not the reference layout: the danger wash and the countdown
+	# both position against the whole screen, and at 1280 they stopped 280 units
+	# short of the bottom on a tall phone.
+	var size := UIKit.screen_size()
+	var w := size.x
+	var h := size.y
 	var data := UIKit.data_font()
 	var display := UIKit.display_font()
 	var pulse := Conductor.beat_pulse(5.0) if Conductor.running else 0.0
@@ -207,7 +211,7 @@ func _draw_judgement(display: Font, data: Font, w: float, pulse: float) -> void:
 	if _popup_age > POPUP_HOLD:
 		alpha = clampf(1.0 - (_popup_age - POPUP_HOLD) / POPUP_FADE, 0.0, 1.0)
 
-	var y := Tuning.PLAYFIELD_HEIGHT * 0.26
+	var y := UIKit.screen_height() * 0.26
 	var col := Tuning.judgement_color(_judgement)
 	var label := Tuning.judgement_label(_judgement)
 	if _judgement_tiers >= Tuning.PERFECT_TIER_SKIP:
@@ -246,8 +250,11 @@ func _draw_countdown(display: Font, w: float, h: float, pulse: float) -> void:
 
 
 func _draw_pause() -> void:
-	var w := Tuning.PLAYFIELD_WIDTH
-	var h := Tuning.PLAYFIELD_HEIGHT
+	# Must cover the ENTIRE screen. A pause overlay that leaves the running
+	# playfield visible along the bottom edge is the worst version of this bug.
+	var size := UIKit.screen_size()
+	var w := size.x
+	var h := size.y
 	var display := UIKit.display_font()
 	var data := UIKit.data_font()
 

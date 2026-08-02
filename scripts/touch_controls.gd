@@ -162,13 +162,13 @@ func _notification(what: int) -> void:
 func _pad_rect_left() -> Rect2:
 	var s := Tuning.PAD_SIZE
 	var m := Tuning.PAD_MARGIN
-	return Rect2(m, Tuning.PLAYFIELD_HEIGHT - s - m, s, s)
+	return Rect2(m, UIKit.screen_height() - s - m, s, s)
 
 
 func _pad_rect_right() -> Rect2:
 	var s := Tuning.PAD_SIZE
 	var m := Tuning.PAD_MARGIN
-	return Rect2(m * 2.0 + s, Tuning.PLAYFIELD_HEIGHT - s - m, s, s)
+	return Rect2(m * 2.0 + s, UIKit.screen_height() - s - m, s, s)
 
 
 ## Pads are drawn faintly: they are a fallback, and the playfield matters more.

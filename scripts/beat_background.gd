@@ -16,10 +16,18 @@ const GRID_SPACING: float = 150.0
 var _scroll_y: float = 0.0
 var _particles: PackedVector2Array = PackedVector2Array()
 var _particle_sizes: PackedFloat32Array = PackedFloat32Array()
+## Vertical wrap distance for the parallax particles, set in _ready() from the
+## REAL viewport height. Initialised from the constant only as a fallback: a
+## member initialiser runs before the node is in the tree, where the viewport
+## size is not yet knowable.
 var _band: float = Tuning.PLAYFIELD_HEIGHT * 2.0
 
 
 func _ready() -> void:
+	# Sized to the real screen, so particles wrap across the whole viewport
+	# rather than a 1280-tall slice of it and leave the bottom band empty.
+	_band = UIKit.screen_height() * 2.0
+
 	# Fixed seed: there is no gameplay reason for the backdrop to differ between
 	# runs, and a stable layout makes visual regressions obvious.
 	var rng := RandomNumberGenerator.new()
@@ -52,8 +60,11 @@ func _draw() -> void:
 		pulse *= 0.15
 		bar *= 0.15
 
-	var w := Tuning.PLAYFIELD_WIDTH
-	var h := Tuning.PLAYFIELD_HEIGHT
+	# The REAL viewport, not the reference layout. At 1280 this painted only the
+	# top 82% of a tall phone's screen and left a black band below.
+	var size := UIKit.screen_size()
+	var w := size.x
+	var h := size.y
 	var top := _scroll_y
 
 	_draw_gradient(top, w, h, bar)
@@ -77,7 +88,7 @@ func _draw_particles(top: float) -> void:
 	for i in _particles.size():
 		var p := _particles[i]
 		var y := fposmod(p.y - offset, _band) + top \
-			- (_band - Tuning.PLAYFIELD_HEIGHT) * 0.5
+			- (_band - UIKit.screen_height()) * 0.5
 		var size := _particle_sizes[i]
 		draw_circle(Vector2(p.x, y), size,
 			Color(0.65, 0.85, 1.0, 0.10 + size * 0.055))

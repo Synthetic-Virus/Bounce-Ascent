@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _test_menu_layout()
 	await _test_menu_navigation()
 	await _test_calibration_layout()
+	await _test_tall_viewport()
 	await _test_touch_controls()
 	await _test_hud_layout()
 	await _test_pause_lifecycle()
@@ -285,6 +286,55 @@ func _test_calibration_layout() -> void:
 		"calibration root does not swallow taps before _unhandled_input")
 
 	calib.queue_free()
+	await get_tree().process_frame
+
+
+## REGRESSION: the layout ignored the real viewport and used the constants.
+##
+## project.godot sets stretch aspect to "expand", so a tall phone gets a TALLER
+## viewport rather than black bars. On a 920x1993 iPhone the 720-wide reference
+## scales by 1.278 and the viewport is really 720x1560, 280 units more than
+## PLAYFIELD_HEIGHT. Everything drawn at 1280 therefore stopped 357 screen
+## pixels short: the background, the danger wash, the pause dim, the results
+## overlay, and the steer pads all floated in the middle of the screen.
+##
+## Nothing caught it because every previous test ran at the default size, where
+## 1280 happens to be correct. This one deliberately makes the window tall.
+func _test_tall_viewport() -> void:
+	print("- tall viewport (expand aspect)")
+	var root := get_tree().root
+	var original := root.size
+
+	root.size = Vector2i(720, 1560)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var h := UIKit.screen_height()
+	print("    viewport height reported as %.0f (constant is %.0f)"
+		% [h, Tuning.PLAYFIELD_HEIGHT])
+	check(h > Tuning.PLAYFIELD_HEIGHT + 100.0,
+		"screen_height() tracks the real viewport, not the constant")
+
+	# Steer pads must reach the REAL bottom edge.
+	var tc: Node = TouchControls.new()
+	add_child(tc)
+	await get_tree().process_frame
+	var pad: Rect2 = tc._pad_rect_left()
+	var bottom_gap: float = h - (pad.position.y + pad.size.y)
+	print("    steer pad bottom gap: %.0f (expected %.0f)"
+		% [bottom_gap, Tuning.PAD_MARGIN])
+	check(absf(bottom_gap - Tuning.PAD_MARGIN) < 2.0,
+		"steer pads sit against the real bottom edge")
+	tc.queue_free()
+
+	# Anything that dims or covers the screen must span the whole of it.
+	var game := await _start_game()
+	var ui: CanvasLayer = game.get_node("GameUI")
+	_assert_on_screen(ui, "GameUI on a tall viewport")
+	game.queue_free()
+	await get_tree().process_frame
+
+	root.size = original
 	await get_tree().process_frame
 
 

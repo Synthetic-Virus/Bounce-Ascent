@@ -69,13 +69,13 @@ func _build() -> void:
 	# is painted as the first thing in _draw() instead.
 	var ruler := preload("res://scenes/BeatRuler.tscn").instantiate()
 	ruler.position = Vector2(18.0, 0.0)
-	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
+	ruler.size = Vector2(UIKit.RULER_WIDTH, UIKit.screen_height())
 	add_child(ruler)
 
 	# Real buttons, not keyboard hints. "Press ESC when done" is meaningless on
 	# a phone, and this screen is the first thing a new player is told to visit.
 	var actions := VBoxContainer.new()
-	actions.position = Vector2(UIKit.MARGIN, Tuning.PLAYFIELD_HEIGHT - 250.0)
+	actions.position = Vector2(UIKit.MARGIN, UIKit.screen_height() - 250.0)
 	actions.size = Vector2(Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0, 190.0)
 	actions.add_theme_constant_override("separation", 12)
 	add_child(actions)
@@ -97,8 +97,11 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var w := Tuning.PLAYFIELD_WIDTH
-	var h := Tuning.PLAYFIELD_HEIGHT
+	# Real viewport: this screen paints its own opaque background, so anything
+	# short of the full height leaves the previous scene showing through.
+	var size := UIKit.screen_size()
+	var w := size.x
+	var h := size.y
 	var display := UIKit.display_font()
 	var data := UIKit.data_font()
 

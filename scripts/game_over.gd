@@ -43,7 +43,7 @@ func _build() -> Control:
 	# Real buttons for the actions, matching the menu. Children draw after the
 	# parent, so these correctly sit above everything _draw_panel paints.
 	var actions := VBoxContainer.new()
-	actions.position = Vector2(UIKit.MARGIN, Tuning.PLAYFIELD_HEIGHT - 260.0)
+	actions.position = Vector2(UIKit.MARGIN, UIKit.screen_height() - 260.0)
 	actions.size = Vector2(Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0, 170.0)
 	actions.add_theme_constant_override("separation", 12)
 	actions.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -92,8 +92,12 @@ func _draw_panel(ci: CanvasItem) -> void:
 	if _visible_result.is_empty():
 		return
 
-	var w := Tuning.PLAYFIELD_WIDTH
-	var h := Tuning.PLAYFIELD_HEIGHT
+	# The dim MUST cover the whole screen. At 1280 the running playfield stayed
+	# visible in the bottom band behind the results, which read as the overlay
+	# being broken rather than translucent.
+	var size := UIKit.screen_size()
+	var w := size.x
+	var h := size.y
 
 	ci.draw_rect(Rect2(0, 0, w, h), Color(UIKit.BG.r, UIKit.BG.g, UIKit.BG.b, 0.9), true)
 

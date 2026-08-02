@@ -51,6 +51,39 @@ const RULER_WIDTH: float = 22.0
 ## Headless could not catch that: screen_get_size() is (0,0) there, so the guard
 ## below returned zero and every layout assertion passed while the real window
 ## showed nothing. Hence the clamp as well as the platform check.
+## The viewport's ACTUAL size in canvas units, which is not 720x1280.
+##
+## project.godot sets stretch aspect to "expand", which grows the viewport
+## rather than letterboxing, so a taller phone genuinely gets a taller viewport.
+## On a 920x1993 iPhone the reference 720 width scales by 1.278 and the viewport
+## becomes 720x1560: **280 units taller than PLAYFIELD_HEIGHT**.
+##
+## Everything that has to reach a screen edge or cover the screen must use this,
+## because the constants describe the reference layout, not the window. Drawing
+## a "full screen" rect at 720x1280 left a 357px unpainted band on device, which
+## showed up as the background stopping short, the results overlay not covering
+## the game, and the steer pads floating well above the bottom edge.
+##
+## Gameplay maths deliberately does NOT use this. The camera anchor, death line
+## and fall allowance stay in reference screens so difficulty cannot depend on
+## the aspect ratio of the phone someone happens to own.
+static func screen_size() -> Vector2:
+	var fallback := Vector2(Tuning.PLAYFIELD_WIDTH, Tuning.PLAYFIELD_HEIGHT)
+	var loop := Engine.get_main_loop() as SceneTree
+	if loop == null or loop.root == null:
+		return fallback
+	var s := loop.root.get_visible_rect().size
+	# Headless reports zero, and a zero-sized fill would silently draw nothing.
+	if s.x <= 1.0 or s.y <= 1.0:
+		return fallback
+	return s
+
+
+## Convenience for the common case, since almost every caller wants the height.
+static func screen_height() -> float:
+	return screen_size().y
+
+
 static func safe_area_insets() -> Vector2:
 	if not OS.has_feature("mobile"):
 		return Vector2.ZERO

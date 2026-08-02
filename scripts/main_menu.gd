@@ -58,7 +58,7 @@ func _build() -> void:
 
 	var ruler := preload("res://scenes/BeatRuler.tscn").instantiate()
 	ruler.position = Vector2(14.0, 0.0)
-	ruler.size = Vector2(UIKit.RULER_WIDTH, Tuning.PLAYFIELD_HEIGHT)
+	ruler.size = Vector2(UIKit.RULER_WIDTH, UIKit.screen_height())
 	add_child(ruler)
 
 	_main_panel = _make_column()
@@ -84,7 +84,7 @@ func _make_column() -> VBoxContainer:
 	col.position = Vector2(UIKit.MARGIN, 80.0 + inset.x)
 	col.size = Vector2(
 		Tuning.PLAYFIELD_WIDTH - UIKit.MARGIN * 2.0,
-		Tuning.PLAYFIELD_HEIGHT - 140.0 - inset.x - inset.y)
+		UIKit.screen_height() - 140.0 - inset.x - inset.y)
 	col.add_theme_constant_override("separation", 12)
 	return col
 
