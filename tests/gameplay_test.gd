@@ -43,6 +43,12 @@ var _judgements: int = 0
 ## every timing measurement in this test. See the check in _run().
 var _environment_stalled: bool = false
 
+## Longest single rendered frame in the run, and when it happened. A landing is
+## resolved by collision during physics, so a frame that takes longer than the
+## beat window can push a landing past it no matter how good the solver is.
+var _worst_frame: float = 0.0
+var _worst_frame_at: float = 0.0
+
 ## Tier of the previous landing, used to tell a solved hop from a fall.
 var _last_landed_tier: int = -1
 
@@ -119,7 +125,15 @@ func _run() -> void:
 	while elapsed < RUN_SECONDS:
 		_steer_toward_next_platform(player, spawner)
 		await get_tree().process_frame
-		elapsed += get_process_delta_time()
+		var frame_dt := get_process_delta_time()
+		elapsed += frame_dt
+		# Worst SINGLE frame, not the average. The aggregate ratio below cannot
+		# see a localised hitch: 165ms lost inside a 25s run moves it by 0.66%,
+		# far under its threshold, which is exactly how two separate visual
+		# features shipped landing errors past it.
+		if frame_dt > _worst_frame:
+			_worst_frame = frame_dt
+			_worst_frame_at = elapsed
 		max_tier = maxi(max_tier, player.current_tier)
 		if _game.state == _game.State.DEAD:
 			print("    died at %.1fs, tier %d" % [elapsed, max_tier])
@@ -142,6 +156,9 @@ func _run() -> void:
 			% [physics_ratio * 100.0, physics_ran, elapsed])
 	else:
 		print("    physics kept %.0f%% of real time" % (physics_ratio * 100.0))
+
+	print("    worst single frame: %.1f ms at %.1fs"
+		% [_worst_frame * 1000.0, _worst_frame_at])
 
 	# --- The climb actually happened ---
 	print("    reached tier %d, %d landings (%d after falls), %d jumps"
