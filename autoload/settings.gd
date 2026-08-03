@@ -38,6 +38,19 @@ var screen_shake: bool = true
 ## preference about how the game plays. Ignored on desktop.
 var haptics: bool = true
 
+## Show the millisecond figure under each judgement.
+##
+## OFF by default, which is the change. It used to be unconditional, and a
+## millisecond count is unusable to the player who most needs help: it says how
+## wrong you were, not which way to correct, and the word above it ("EARLY",
+## "LATE") already carries the actionable half. On an auto-launch it printed
+## "EARLY  0 ms", which is not even true.
+##
+## Kept as a setting rather than deleted because the player chasing a PERFECT
+## streak genuinely uses it, and they are exactly the player who will open
+## Settings looking for it.
+var timing_detail: bool = false
+
 ## Touch steering. On-screen pads are the default; tilt is opt-in.
 ##
 ## Tilt was the original default, on the reasoning that it leaves the whole
@@ -87,6 +100,7 @@ func load_settings() -> void:
 	flash_effects = cfg.get_value("video", "flash_effects", flash_effects)
 	screen_shake = cfg.get_value("video", "screen_shake", screen_shake)
 	haptics = cfg.get_value("video", "haptics", haptics)
+	timing_detail = cfg.get_value("video", "timing_detail", timing_detail)
 	last_song_id = cfg.get_value("game", "last_song_id", last_song_id)
 	tilt_steering = cfg.get_value("controls", "tilt_steering", tilt_steering)
 
@@ -115,6 +129,7 @@ func save_settings() -> void:
 	cfg.set_value("video", "flash_effects", flash_effects)
 	cfg.set_value("video", "screen_shake", screen_shake)
 	cfg.set_value("video", "haptics", haptics)
+	cfg.set_value("video", "timing_detail", timing_detail)
 	cfg.set_value("game", "last_song_id", last_song_id)
 	cfg.set_value("controls", "tilt_steering", tilt_steering)
 	# Marks the tilt migration as done, so a player who deliberately chooses

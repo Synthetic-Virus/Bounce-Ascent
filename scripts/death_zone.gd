@@ -28,7 +28,7 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	var pulse := Conductor.beat_pulse(3.0) if Conductor.running else 0.0
+	var pulse := Conductor.ambient_pulse(3.0) if Conductor.running else 0.0
 	if not Settings.flash_effects:
 		pulse *= 0.2
 

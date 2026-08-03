@@ -61,8 +61,8 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	var pulse := Conductor.beat_pulse(4.0) if Conductor.running else 0.0
-	var bar := Conductor.bar_pulse(2.5) if Conductor.running else 0.0
+	var pulse := Conductor.ambient_pulse(4.0) if Conductor.running else 0.0
+	var bar := Conductor.ambient_bar_pulse(2.5) if Conductor.running else 0.0
 	if not Settings.flash_effects:
 		# Keep a trace of motion but remove the strobing.
 		pulse *= 0.15

@@ -87,7 +87,18 @@ const BLOB_MAX_DEFORM: float = 0.62
 const BEAT_RING_SPREAD: float = 46.0
 
 ## Peak opacity of the ring as it closes.
-const BEAT_RING_ALPHA: float = 0.55
+##
+## Raised from 0.55 once the ambient pulsing was damped. The ring has to be the
+## clearest beat signal on screen, and it was competing against six brighter
+## ones; with those quieted it had to come up to meet the gap rather than simply
+## win by everything else going away.
+const BEAT_RING_ALPHA: float = 0.90
+
+## Emissive gain on the ring, so it blooms like everything else neon.
+##
+## It was the ONLY element that never crossed the glow threshold, which made the
+## single most important cue in the game the flattest thing in it.
+const BEAT_RING_GLOW: float = 1.6
 
 ## Consecutive mistimed presses on the EASIEST track before the game simply
 ## shows the beat with a flashing TAP.
@@ -97,6 +108,28 @@ const BEAT_RING_ALPHA: float = 0.55
 ## and on the easiest track the right response is to show it to them rather than
 ## let them keep guessing.
 const ASSIST_AFTER_MISSES: int = 3
+
+
+## How much of a full beat pulse AMBIENT elements are allowed to show.
+##
+## THE PROBLEM THIS SOLVES: if everything pulses on the beat, nothing does.
+##
+## Seven things flashed on the same instant: the player's glow, every platform's
+## glow, the background grid, the gradient, the horizon, the death line and the
+## HUD. The approach ring, which is the ONE cue a player can actually time an
+## input against, was a thin white outline competing with a full-screen light
+## show.
+##
+## Worse, they were the wrong KIND of cue. Every one of them fires ON the beat,
+## which shows where it just WAS. Only the ring shows the beat ARRIVING, and that
+## is the whole reason it was added: family testers could not find the beat
+## without sound. The reasoning is written into the ring's own comment, and six
+## louder things were doing the opposite of it.
+##
+## 0.35 keeps the world visibly alive on the music, which is most of the game's
+## character, while leaving the ring and the TAP assist unmistakably the loudest
+## things on the beat. Both of those are deliberately NOT damped.
+const AMBIENT_PULSE: float = 0.35
 
 
 ## Radius of the approach ring, for a body radius and a position within the beat.

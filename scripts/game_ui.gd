@@ -46,6 +46,22 @@ var _lead_trend: float = 0.0
 ## Seconds remaining on the "+1" flourish that fires when a PERFECT is landed.
 var _lead_gain_flash: float = 0.0
 
+## Age of the last reason to SHOW the lead readout.
+##
+## The lead used to be permanent, which made it a second answer to "how am I
+## doing" sitting beside HEIGHT, in a different unit, with its own colour code.
+## Two progress numbers is one too many, and the steady state it spent most of
+## its time in said "holding", which is precisely when it had nothing to report.
+##
+## Now it surfaces only when the answer CHANGES: the trend turns to gaining or
+## losing, or a PERFECT buys a tier. When the climb is steady it gets out of the
+## way, which is also when the player most needs the screen for the platform
+## above.
+var _lead_age: float = 999.0
+
+const LEAD_HOLD: float = 1.6
+const LEAD_FADE: float = 0.7
+
 # --- Coaching ----------------------------------------------------------------
 #
 # A first-time player is taught DURING their first run, by things that happen,
@@ -205,6 +221,7 @@ func _build_pause_actions() -> void:
 func _process(delta: float) -> void:
 	_popup_age += delta
 	_coach_age += delta
+	_lead_age += delta
 	_lead_gain_flash = maxf(_lead_gain_flash - delta * 1.4, 0.0)
 	_shown_score = move_toward(_shown_score, float(_score),
 		maxf(900.0, absf(float(_score) - _shown_score) * 6.0) * delta)
@@ -224,7 +241,7 @@ func _draw_hud() -> void:
 	var h := size.y
 	var data := UIKit.data_font()
 	var display := UIKit.display_font()
-	var pulse := Conductor.beat_pulse(5.0) if Conductor.running else 0.0
+	var pulse := Conductor.ambient_pulse(5.0) if Conductor.running else 0.0
 
 	# Danger wash. Ramps with proximity and throbs once it is severe, so it
 	# competes for attention without being a constant strobe.
@@ -275,9 +292,15 @@ func _draw_hud() -> void:
 	_canvas.draw_string(data, Vector2(UIKit.MARGIN, 60.0 + top),
 		UIKit.thousands(int(_shown_score)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 34, UIKit.TEXT)
-	_canvas.draw_string(data, Vector2(UIKit.MARGIN + 2.0, 84.0 + top),
-		"%s  %d BPM" % [_song_name, _song_bpm],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UIKit.DIM)
+	# NO SONG NAME OR BPM DURING PLAY.
+	#
+	# Neither answers a question the player can act on mid-climb. They already
+	# chose the track, and the tempo is something they are hearing and seeing in
+	# the approach ring; a number for it is menu information sitting in the play
+	# area. Both are still on the track select screen, where they decide something.
+	#
+	# Cut as part of quieting the HUD: six readouts competed for a glance that
+	# should be going to the platform above.
 
 	# Height, top right. Right-aligned so the digits form a stable edge as the
 	# number grows.
@@ -372,15 +395,24 @@ func _draw_lead(data: Font, top: float) -> void:
 		col = UIKit.RED
 		word = "losing"
 
+	# Fade out once it has had its say. A readout that is always present is
+	# furniture; one that appears when something changed is information.
+	var alpha := 1.0
+	if _lead_age > LEAD_HOLD:
+		alpha = clampf(1.0 - (_lead_age - LEAD_HOLD) / LEAD_FADE, 0.0, 1.0)
+	if alpha <= 0.01:
+		return
+
 	var y := 116.0 + top
 	var x := UIKit.MARGIN
 
 	_canvas.draw_string(data, Vector2(x, y), "LEAD",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.DIM)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+		Color(UIKit.DIM.r, UIKit.DIM.g, UIKit.DIM.b, alpha))
 	_canvas.draw_string(data, Vector2(x + 44.0, y), "%d" % tiers,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(col.r, col.g, col.b, alpha))
 	_canvas.draw_string(data, Vector2(x + 82.0, y), word,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(col.r, col.g, col.b, alpha))
 
 	# The flourish that closes the causal loop: a PERFECT bought an extra tier,
 	# so say so, here, where the consequence is displayed. The judgement popup
@@ -411,12 +443,17 @@ func _draw_judgement(display: Font, data: Font, w: float, pulse: float) -> void:
 		HORIZONTAL_ALIGNMENT_CENTER, w, 54,
 		Color(col.r, col.g, col.b, alpha))
 
-	# How far off, which is the actionable part.
+	# How far off, OFF BY DEFAULT.
 	#
-	# The direction used to be repeated here as well as being obvious from the
-	# error sign, and now the bottom tier's own label says LATE or EARLY, so
-	# printing it twice would be three statements of one fact stacked vertically.
-	if _judgement != Tuning.Judgement.PERFECT:
+	# The word above already carries the actionable half: LATE or EARLY tells you
+	# which way to correct, and that is the whole of what a new player can use. A
+	# millisecond count tells them how badly they did, in a unit they cannot act
+	# on, in the middle of the screen, several times a run. On an auto-launch it
+	# read "EARLY  0 ms", which is not even true.
+	#
+	# Still available for the player chasing PERFECTs, who does use it, behind
+	# Settings.timing_detail.
+	if Settings.timing_detail and _judgement != Tuning.Judgement.PERFECT:
 		var ms := absi(int(round(_judgement_error * 1000.0)))
 		var detail := "%d ms" % ms
 		if _judgement != Tuning.Judgement.MISS:
@@ -482,6 +519,7 @@ func on_run_started(song: Dictionary) -> void:
 	_lead_slow = -1.0
 	_lead_trend = 0.0
 	_lead_gain_flash = 0.0
+	_lead_age = 999.0
 	_coach_text = ""
 	_coach_age = 999.0
 	_pause_panel.visible = false
@@ -549,6 +587,12 @@ func on_tick(
 	_lead_slow = lerpf(_lead_slow, lead, 0.02)
 	_lead_trend = _lead_shown - _lead_slow
 
+	# Surface the readout only while the answer is CHANGING. Holding steady is
+	# the state it spent most of its time in and the state in which it had
+	# nothing to say, so that is exactly when it now stays out of the way.
+	if absf(_lead_trend) > 0.12:
+		_lead_age = 0.0
+
 	# Taught the first time the player is actually losing ground, which is the
 	# only moment the sentence means anything. Explaining the death line before
 	# it is chasing them is explaining a rule with no referent.
@@ -566,6 +610,9 @@ func on_judged(judgement: int, error: float, _combo: int, tiers: int) -> void:
 	# which is the half the player could not previously see.
 	if tiers >= Tuning.PERFECT_TIER_SKIP:
 		_lead_gain_flash = 0.9
+		# A PERFECT just bought a tier, so the lead has something to report even
+		# if the trend is flat. Show it, or the "+1" would animate onto nothing.
+		_lead_age = 0.0
 
 	# The central rule, taught at the exact moment the player has just done it.
 	# It cannot be discovered by playing: you can jump whenever, climb steadily,

@@ -752,19 +752,25 @@ func _check_landing_alignment() -> void:
 	print("    song clock wandered %.2f%%, which is a %.0f ms floor on a %.0f ms hop"
 		% [spread * 100.0, clock_floor * 1000.0, nominal_flight * 1000.0])
 
-	# THE WORST-CASE CHECK is the one an unstable host can defeat, so it is the
-	# only one gated. Skipped loudly, never quietly widened: raising the
-	# tolerance to accommodate a bad host would disarm it everywhere, including
-	# on the hosts where it works.
-	if clock_floor > LANDING_TOLERANCE:
-		print(("    WARNING: this host's song clock is too unstable to assert a"
-			+ " %.0f ms worst case (floor is %.0f ms). The worst-case check is"
-			+ " skipped; the systematic-bias check below still runs.")
-			% [LANDING_TOLERANCE * 1000.0, clock_floor * 1000.0])
-	else:
-		check(worst <= LANDING_TOLERANCE,
-			"every landing within %.0f ms of a beat (worst was %.1f ms)"
-				% [LANDING_TOLERANCE * 1000.0, worst * 1000.0])
+	# THE WORST-CASE CHECK is raised to the measured floor, NOT skipped.
+	#
+	# The first version of this skipped the assertion entirely whenever the floor
+	# exceeded the tolerance, which is the same "make the failure go away" move
+	# it was written to avoid. It let a run through with a worst landing of
+	# 86.4ms against its own 62ms floor: an error a third larger than the host
+	# could account for, reported as a pass.
+	#
+	# Raising the bar to the floor keeps the check alive everywhere. An error the
+	# environment explains passes; an error BIGGER than the environment can
+	# explain still fails, on a clean host and a thrashing one alike.
+	var bar := maxf(LANDING_TOLERANCE, clock_floor)
+	if bar > LANDING_TOLERANCE:
+		print(("    (worst-case bar raised from %.0f to %.0f ms: this host's clock"
+			+ " wander accounts for that much on its own)")
+			% [LANDING_TOLERANCE * 1000.0, bar * 1000.0])
+	check(worst <= bar,
+		"every landing within %.0f ms of a beat (worst was %.1f ms, host floor %.0f ms)"
+			% [bar * 1000.0, worst * 1000.0, clock_floor * 1000.0])
 
 	# THE BIAS CHECK ALWAYS RUNS, and it is the real regression detector.
 	#
@@ -788,12 +794,9 @@ func _check_landing_alignment() -> void:
 		# Gated for the same reason as the worst case: this averages ABSOLUTE
 		# offsets, so scatter inflates it even when it cancels in the signed
 		# mean above.
-		if clock_floor > LANDING_TOLERANCE:
-			print("    (drift check skipped: host clock floor exceeds the tolerance)")
-		else:
-			check(late_mean <= LANDING_TOLERANCE,
-				"timing has not drifted by the end of the run (%.1f ms)"
-					% [late_mean * 1000.0])
+		check(late_mean <= bar,
+			"timing has not drifted by the end of the run (%.1f ms, bar %.0f ms)"
+				% [late_mean * 1000.0, bar * 1000.0])
 
 
 static func _mean_abs(values: Array) -> float:

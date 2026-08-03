@@ -120,6 +120,20 @@ func beat_pulse(sharpness: float = 3.0) -> float:
 	return pow(1.0 - beat_progress(), sharpness)
 
 
+## A beat pulse for AMBIENT decoration: scenery, glow, the backdrop.
+##
+## Scaled down so the cues the player has to READ stay louder than the ones that
+## are only atmosphere. Anything the player times an input against should call
+## beat_pulse directly and keep its full range; see Tuning.AMBIENT_PULSE.
+func ambient_pulse(sharpness: float = 3.0) -> float:
+	return beat_pulse(sharpness) * Tuning.AMBIENT_PULSE
+
+
+## A bar pulse for ambient decoration. Same reasoning as ambient_pulse.
+func ambient_bar_pulse(sharpness: float = 2.0) -> float:
+	return bar_pulse(sharpness) * Tuning.AMBIENT_PULSE
+
+
 func bar_pulse(sharpness: float = 2.0) -> float:
 	var bar_beats: float = fmod(song_beats, float(beats_per_bar))
 	return pow(1.0 - (bar_beats / float(beats_per_bar)), sharpness)

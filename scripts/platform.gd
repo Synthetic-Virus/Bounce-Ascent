@@ -173,7 +173,7 @@ func _set_solid(solid: bool) -> void:
 
 
 func _draw() -> void:
-	var pulse := Conductor.beat_pulse(5.0) if Conductor.running else 0.0
+	var pulse := Conductor.ambient_pulse(5.0) if Conductor.running else 0.0
 	var col := _colour()
 	var alpha := _alpha()
 	if alpha <= 0.01:

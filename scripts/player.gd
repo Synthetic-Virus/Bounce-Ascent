@@ -485,7 +485,9 @@ func _draw() -> void:
 
 
 func _draw_body() -> void:
-	var pulse := Conductor.beat_pulse(4.0) if Conductor.running else 0.0
+	# Ambient: the body's glow is atmosphere. The approach ring drawn below is
+	# the cue, and it keeps its full range.
+	var pulse := Conductor.ambient_pulse(4.0) if Conductor.running else 0.0
 
 	_draw_beat_ring()
 
@@ -558,14 +560,28 @@ func _draw_beat_ring() -> void:
 	# Sharpen as it closes. A ring that is equally faint all the way round its
 	# travel reads as decoration; one that resolves reads as an approach.
 	var focus := pow(progress, 2.2)
-	var alpha := Tuning.BEAT_RING_ALPHA * (0.35 + 0.65 * focus)
-	var width := 2.0 + focus * 2.5
+	var alpha := Tuning.BEAT_RING_ALPHA * (0.40 + 0.60 * focus)
+	var width := 2.0 + focus * 3.0
 
 	if not Settings.flash_effects:
 		alpha *= 0.65
 
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40,
-		Color(1.0, 1.0, 1.0, alpha), width, true)
+	# EMISSIVE, and rising as it closes.
+	#
+	# Damping everything else was only half the job. This ring is the one cue a
+	# player can time an input against, and it was the only thing on screen that
+	# did not pass the glow threshold: every platform, the player, the backdrop
+	# and the horizon all bloomed while the ring was a flat grey outline. Quieting
+	# its competition without raising the signal just made the whole screen dim.
+	#
+	# The gain climbs with focus so the ring is at its brightest exactly as it
+	# meets the body, which is the instant the player has to act on. A cue that
+	# peaks anywhere else is telling them about the wrong moment.
+	var gain := Tuning.BEAT_RING_GLOW * (0.75 + 0.85 * focus)
+	var col := UIKit.emissive(Color(1.0, 1.0, 1.0), gain)
+	col.a = alpha
+
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40, col, width, true)
 
 
 func _draw_blob(centre: Vector2, rx: float, ry: float, wobble: float,

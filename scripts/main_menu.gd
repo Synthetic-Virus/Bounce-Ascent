@@ -28,6 +28,7 @@ var _volume_value: Label
 var _flash: Button
 var _shake: Button
 var _haptics: Button
+var _timing: Button
 var _steering: Button
 var _calibrate: Button
 var _status: Label
@@ -191,6 +192,11 @@ func _build_settings(col: VBoxContainer) -> void:
 
 	# Hidden rather than omitted on desktop, so _refresh does not need to know
 	# whether the control exists. A hidden child takes no space in a VBox.
+	_timing = UIKit.button("", UIKit.CYAN, 20)
+	_timing.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
+	_timing.pressed.connect(_toggle_timing_detail)
+	col.add_child(_timing)
+
 	_haptics = UIKit.button("", UIKit.CYAN, 20)
 	_haptics.custom_minimum_size = Vector2(0, Tuning.TOUCH_MIN)
 	_haptics.visible = OS.has_feature("mobile")
@@ -343,6 +349,12 @@ func _toggle_shake() -> void:
 	_refresh()
 
 
+func _toggle_timing_detail() -> void:
+	Settings.timing_detail = not Settings.timing_detail
+	Settings.save_settings()
+	_refresh()
+
+
 func _toggle_haptics() -> void:
 	Settings.haptics = not Settings.haptics
 	Settings.save_settings()
@@ -411,6 +423,7 @@ func _refresh() -> void:
 	_howto.add_theme_color_override("font_color",
 		UIKit.CYAN if played else UIKit.GOLD)
 
+	_timing.text = "Timing detail   %s" % ("on" if Settings.timing_detail else "off")
 	_flash.text = "Flash effects   %s" % ("on" if Settings.flash_effects else "off")
 	_shake.text = "Screen shake    %s" % ("on" if Settings.screen_shake else "off")
 	_haptics.text = "Vibration       %s" % ("on" if Settings.haptics else "off")
