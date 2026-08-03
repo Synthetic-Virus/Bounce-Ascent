@@ -91,8 +91,9 @@ func _capture(shot_name: String, why: String) -> void:
 ## Same steering controller as the other probes, so the shots show the game
 ## being played rather than a body falling.
 func _steer(player: CharacterBody2D, spawner: Node2D) -> void:
-	var target_x: float = spawner.x_of_tier(player.current_tier + 1)
-	if target_x < 0.0:
+	var next_tier: int = player.current_tier + 1
+	var target_x: float = spawner.x_of_tier(next_tier)
+	if not spawner.has_tier(next_tier):
 		Input.action_release("move_left")
 		Input.action_release("move_right")
 		return

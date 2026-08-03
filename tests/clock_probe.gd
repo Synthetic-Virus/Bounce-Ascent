@@ -324,8 +324,12 @@ func _dump(label: String, h: Dictionary, names: Array) -> void:
 # --- Steering (same controller as gameplay_test) ----------------------------
 
 func _steer(spawner: Node2D) -> void:
-	var target_x: float = spawner.x_of_tier(_player.current_tier + 1)
-	if target_x < 0.0:
+	# has_tier, not target_x < 0. A MOVING platform sways up to 150px around its
+	# home x, so one homed near the left edge is at a negative x while perfectly
+	# alive, and this controller used to give up on steering toward it.
+	var next_tier: int = _player.current_tier + 1
+	var target_x: float = spawner.x_of_tier(next_tier)
+	if not spawner.has_tier(next_tier):
 		_release()
 		return
 

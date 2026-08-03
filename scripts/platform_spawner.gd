@@ -69,6 +69,19 @@ func update_for(player_tier: int, camera_bottom_y: float) -> void:
 			_recycle(tier)
 
 
+## Is a tier currently populated?
+##
+## Separate from x_of_tier because a COORDINATE CANNOT DOUBLE AS AN EXISTENCE
+## FLAG here. x_of_tier returns -1 for "not live", and a caller testing
+## `x_of_tier(t) >= 0.0` reads that as the question "does this tier exist" --
+## but a MOVING platform sways up to 150px around its home x, so one homed near
+## the left edge is legitimately at a negative x while perfectly alive. The
+## gameplay test asserted exactly that and reported a spawner failure that had
+## not happened.
+func has_tier(tier: int) -> bool:
+	return _live.has(tier)
+
+
 ## x of a tier's platform, or -1 if not live. Used by tests and the HUD.
 func x_of_tier(tier: int) -> float:
 	if not _live.has(tier):

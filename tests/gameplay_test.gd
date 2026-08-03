@@ -246,9 +246,12 @@ func _run() -> void:
 
 	# --- The spawner kept up ---
 	# Platforms must exist above the player, or the climb would dead-end.
-	check(spawner.x_of_tier(max_tier + 1) >= 0.0,
+	# has_tier, not x_of_tier >= 0. A MOVING platform sways up to 150px around
+	# its home x, so one homed near the left edge sits at a negative x while
+	# perfectly alive, and this check used to report a spawner failure for it.
+	check(spawner.has_tier(max_tier + 1),
 		"a platform exists one tier above the player")
-	check(spawner.x_of_tier(max_tier + 5) >= 0.0,
+	check(spawner.has_tier(max_tier + 5),
 		"the spawner is populating well ahead of the player")
 
 	# --- THE important check: do real landings fall on beats? ---
@@ -535,8 +538,12 @@ func _start_game() -> Node2D:
 ## Input.get_axis() call is exercised, rather than reaching past it and writing
 ## velocity directly. Testing the real input path is the whole point.
 func _steer_toward_next_platform(player: CharacterBody2D, spawner: Node2D) -> void:
-	var target_x: float = spawner.x_of_tier(player.current_tier + 1)
-	if target_x < 0.0:
+	# has_tier, not target_x < 0. A MOVING platform swaying left past x=0 is
+	# alive and reachable; treating it as absent made the robot release the stick
+	# and fall, which then looked like a game bug rather than a test one.
+	var next_tier: int = player.current_tier + 1
+	var target_x: float = spawner.x_of_tier(next_tier)
+	if not spawner.has_tier(next_tier):
 		_release_steering()
 		return
 
