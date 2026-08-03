@@ -138,11 +138,7 @@ func start_run() -> void:
 	_player.reset(START_POSITION - Vector2(
 		0.0, Tuning.PLATFORM_HALF_HEIGHT + _player.RADIUS + 2.0))
 	_camera.reset(_player.global_position.y)
-	# Seed the player's copy immediately rather than waiting for the first
-	# _process_playing tick. Physics runs at 120Hz and can fire between the
-	# count-in ending and the next _process, so "it will be set shortly" is not
-	# good enough for a value that decides whether the player is alive.
-	_player.death_y = _camera.death_line_y()
+	_publish_camera_state()
 
 	# Freeze the player through the count-in.
 	_player.active = false
@@ -196,15 +192,41 @@ func _process_countdown() -> void:
 		_ui.on_countdown_finished()
 
 
+## Hand the camera's derived values to everything that draws from them.
+##
+## ONE function, called from both start_run and _process_playing, because this
+## has now gone wrong twice in the same way.
+##
+## Every one of these was originally set only while PLAYING, so the whole
+## count-in rendered against stale values. Screenshots of it showed the bottom
+## two thirds of the screen filled with the red death wash and the death line
+## drawn a few pixels under the player's feet, and the background gradient
+## anchored to world zero instead of the camera, leaving a hard black seam
+## across the middle of the screen.
+##
+## That is the worst possible first frame. The count-in is the one moment built
+## to teach a new player the tempo before anything is at stake, and it opened by
+## telling them they were about to die.
+##
+## The fix is deliberately a shared function rather than three more lines in
+## start_run: the next value derived from the camera will be added to one place,
+## and both callers will get it.
+func _publish_camera_state() -> void:
+	# The player's own copy matters most: physics runs at 120Hz and can fire
+	# between the count-in ending and the next _process, so "it will be set
+	# shortly" is not good enough for the value that decides whether they live.
+	_player.death_y = _camera.death_line_y()
+	_background.set_scroll(_camera.top_y())
+	_death_zone.set_line(_camera.death_line_y())
+
+
 func _process_playing(delta: float) -> void:
 	highest_tier = maxi(highest_tier, _player.current_tier)
 
 	_camera.update_camera(delta, _player.global_position.y, _player.current_tier)
-	_player.death_y = _camera.death_line_y()
 	_spawner.update_for(_player.current_tier, _camera.bottom_y())
+	_publish_camera_state()
 
-	_background.set_scroll(_camera.top_y())
-	_death_zone.set_line(_camera.death_line_y())
 	_ui.on_tick(score, combo, highest_tier, _camera.death_line_y(),
 		_player.global_position.y)
 

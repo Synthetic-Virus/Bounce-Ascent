@@ -236,6 +236,42 @@ func _draw_hud() -> void:
 	# Score, top left. Everything in the top bar is offset by the safe-area
 	# inset so it clears a notch or Dynamic Island.
 	var top := _top_inset
+
+	# SCRIM BEHIND THE TOP BAR.
+	#
+	# There was none, and the HUD is a CanvasLayer drawn straight over the
+	# playfield, so a bright platform climbing past the top of the screen ran
+	# directly underneath the score and the lead readout. A screenshot caught
+	# the word "holding" half buried in a glowing yellow platform.
+	#
+	# Faded rather than a hard band: a solid bar would cut the playfield with a
+	# visible edge and shrink the sense of height, which is the one thing this
+	# game is about. Opaque where the text is, gone by the time it reaches the
+	# playfield.
+	# SOLID PAST THE LAST LINE OF TEXT, then a short fade.
+	#
+	# A first attempt ramped down as (1-t)^2 across the whole strip, which sounds
+	# like a gentle fade and is not: by the lead readout at y=111 it was seven
+	# percent opaque, and a screenshot showed a glowing platform passing straight
+	# through the word "holding". A scrim that is transparent where the text is
+	# has covered nothing.
+	#
+	# The bottom text sits at 118 plus the safe-area inset, so the cover is held
+	# to 130 and only then given somewhere to go. Fading over the last 45px keeps
+	# it from cutting the playfield with a visible edge, which would flatten the
+	# sense of height this whole game is about.
+	var scrim_solid := 130.0 + top
+	var scrim_fade := 45.0
+	_canvas.draw_rect(Rect2(0, 0, w, scrim_solid),
+		Color(UIKit.BG.r, UIKit.BG.g, UIKit.BG.b, 0.94), true)
+	var scrim_bands := 8
+	for i in scrim_bands:
+		var t := float(i) / float(scrim_bands)
+		var a := (1.0 - t) * (1.0 - t) * 0.94
+		_canvas.draw_rect(
+			Rect2(0, scrim_solid + t * scrim_fade, w,
+				scrim_fade / float(scrim_bands) + 1.0),
+			Color(UIKit.BG.r, UIKit.BG.g, UIKit.BG.b, a), true)
 	_canvas.draw_string(data, Vector2(UIKit.MARGIN, 60.0 + top),
 		UIKit.thousands(int(_shown_score)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 34, UIKit.TEXT)

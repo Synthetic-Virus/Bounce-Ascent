@@ -64,7 +64,22 @@ func setup(
 	_home_x = pos.x
 	move_amplitude = amplitude
 	half_width = Tuning.PLATFORM_HALF_WIDTH * width_scale
-	hue_offset = fposmod(float(new_tier) * 0.021, 1.0)
+	# A NARROW BAND around cyan, not a trip round the whole colour wheel.
+	#
+	# This used to be fposmod(tier * 0.021, 1.0), a full 0..1 sweep, so a plain
+	# platform's hue drifted through every colour as the player climbed. By tier
+	# 20 it had reached red, which is the CRUMBLING colour, and higher still it
+	# passed through amber (MOVING) and violet (PHASING).
+	#
+	# That defeats the type code this file's own _colour() sets up: "cyan is
+	# safe, amber moves, red crumbles, violet phases" is only true if safe stays
+	# cyan. A screenshot of tier 22 showed a screen of plain platforms rendered
+	# in exactly the palette that is supposed to mean danger.
+	#
+	# A triangle wave over +/-0.05 keeps the intended shimmer between neighbours
+	# while never leaving the cyan-to-teal band, and never wrapping.
+	var sweep := fposmod(float(new_tier) * 0.085, 2.0)
+	hue_offset = (sweep if sweep <= 1.0 else 2.0 - sweep) * 0.10 - 0.05
 	# Derived from the tier so a recycled platform does not inherit a phase and
 	# suddenly jump. Deterministic, unlike randf().
 	_phase_offset = fposmod(float(new_tier) * 0.37, 1.0) * TAU

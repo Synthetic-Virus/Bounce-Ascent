@@ -352,7 +352,34 @@ func _current_platform() -> Node2D:
 
 # --- Rendering --------------------------------------------------------------
 
+## Draw the body, and draw it AGAIN across the wrap seam when it straddles one.
+##
+## The playfield wraps horizontally, but the body was drawn once, at its single
+## position, so crossing an edge made the player vanish: a screenshot caught it
+## sliced in half at x=710 of 720 with nothing on the left edge, and another
+## caught the same at x=10 with nothing on the right.
+##
+## That is not cosmetic. Wrapping is a real route to the next platform, so the
+## player is asked to steer through the one region where they cannot see
+## themselves. The fix is a second draw one playfield width away, which is where
+## the body already is as far as the world is concerned.
 func _draw() -> void:
+	_draw_body()
+
+	var w := Tuning.PLAYFIELD_WIDTH
+	var x := global_position.x
+	# Only when actually overlapping a seam, so the ordinary case costs nothing.
+	if x < RADIUS:
+		draw_set_transform(Vector2(w, 0.0))
+		_draw_body()
+		draw_set_transform(Vector2.ZERO)
+	elif x > w - RADIUS:
+		draw_set_transform(Vector2(-w, 0.0))
+		_draw_body()
+		draw_set_transform(Vector2.ZERO)
+
+
+func _draw_body() -> void:
 	var pulse := Conductor.beat_pulse(4.0) if Conductor.running else 0.0
 
 	_draw_beat_ring()

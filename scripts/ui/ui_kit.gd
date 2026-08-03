@@ -164,7 +164,39 @@ static func data_font() -> Font:
 ## multiplying alpha here would make fading platforms stop glowing before they
 ## stop being visible.
 static func emissive(c: Color, gain: float) -> Color:
-	return Color(c.r * gain, c.g * gain, c.b * gain, c.a)
+	# PRE-COMPENSATE SATURATION FOR THE CLIPPING THE GAIN WILL CAUSE.
+	#
+	# Multiplying every channel by the gain is the obvious implementation and it
+	# quietly destroys the colour. A screenshot of the game showed every platform
+	# as pale cream instead of cyan, amber, red and violet: the neon palette had
+	# become one washed-out beige.
+	#
+	# The arithmetic, for a full-value colour where the largest channel is 1.0
+	# and the smallest is 1 - s:
+	#
+	#     after gain:  max -> g          (clips to 1.0 on display)
+	#                  min -> (1 - s)*g
+	#     seen saturation = 1 - min/max = 1 - (1 - s)*g
+	#
+	# At s = 0.55 and g = 1.7 that is 1 - 0.765 = 0.235: less than half the
+	# saturation asked for. The brighter the glow, the greyer the colour, which
+	# is the exact opposite of neon. Cyan at gain 1.7 arrives as (0.77, 1, 1),
+	# and a red channel at 0.77 is not cyan any more.
+	#
+	# Solving 1 - (1 - s')*g = s for the saturation to REQUEST gives
+	#
+	#     s' = 1 - (1 - s)/g
+	#
+	# so the colour that survives clipping is the colour that was asked for.
+	# Derived rather than dialled in, so it stays correct if a gain changes.
+	#
+	# Greys are untouched: s = 0 gives s' = 0, and the white core stays white.
+	if gain <= 1.0 or c.s <= 0.0:
+		return Color(c.r * gain, c.g * gain, c.b * gain, c.a)
+
+	var wanted := clampf(1.0 - (1.0 - c.s) / gain, 0.0, 1.0)
+	var pure := Color.from_hsv(c.h, wanted, c.v, c.a)
+	return Color(pure.r * gain, pure.g * gain, pure.b * gain, c.a)
 
 
 ## Give a scene a real bloom pass.
