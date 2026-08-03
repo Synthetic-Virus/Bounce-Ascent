@@ -84,6 +84,56 @@ Loop wraps are counted, not ignored: `get_playback_position()` resets to zero
 each loop, so `_loop_count` is incremented on a large backwards jump and added
 back on, giving a clock that only ever increases.
 
+### The two clocks run at different speeds
+
+"Physics must keep up" is necessary and was not sufficient. It compares physics
+time to real time, and physics can keep perfect pace with real time while every
+landing still misses its beat, because **the song clock is a third clock and it
+does not run at the same speed as the other two.**
+
+The song clock comes from the audio device's oscillator. The physics clock comes
+from the system timer. Nothing makes them agree, and they do not: measured at
+**8.6% apart** on the headless test host, and Bluetooth audio is the everyday
+case on real hardware, where a resampling headset runs a clock of its own.
+
+An arc is solved in **song** seconds and simulated in **real** seconds:
+
+```gdscript
+flight = quantise_landing_time(now, spb) - now   # song seconds
+velocity.y = -solve_launch_velocity(rise, flight)  # simulated on the physics clock
+```
+
+Handing one to the other assumes a 1:1 rate. When the rate is `r`, the landing
+arrives `(1 - r) * flight_time` early: **86 ms on a one second hop**, on every
+hop, forever. It presents as a large timing error with no dropped frames, which
+is why it survived so long and why two visual features were wrongly blamed and
+shelved for it.
+
+`Music` therefore measures the ratio of song-clock advance to wall-clock advance
+over a sliding window and exposes `song_to_real()`. `player.gd` converts the
+solved flight before simulating it. When the clocks agree the conversion is a
+no-op, so correct hardware pays nothing.
+
+**The window is a timing budget, not a preference.** The estimate's error lands
+on the beat as `(1 - rate) * flight_time`, so 2.5% of rate error is a 25 ms miss.
+Hence a 1.5 s minimum measurement, a 6 s maximum window, and no exponential
+smoothing: `get_audio_time()` is called at an arbitrary rate, so a smoother would
+converge at a speed that depended on how often it happened to run.
+
+**What the tests assert, and why the split matters.** Clock wander is zero-mean,
+so it scatters landings either side of the beat but cannot bias them. The
+systematic-bias check therefore always runs and is the real regression detector
+(the bug showed up there as `mean -82.2 ms`). Only the worst-case and drift
+checks are gated, loudly, when the measured host floor exceeds the tolerance. The
+tolerance itself was deliberately **not** widened: that would have disarmed the
+check on the hosts where it works.
+
+`tests/clock_probe.gd` is the diagnostic. It records every hop on two independent
+clocks and prints `real - solved` (did the simulation deliver the arc it was
+asked for?) against `audio - real` (did the song clock keep up?). Those two
+numbers separate a solver bug from a clock bug in one line of output, which is
+the thing that was missing.
+
 ---
 
 ## 2. Beat-quantised jump arcs
