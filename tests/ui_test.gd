@@ -457,6 +457,21 @@ func _test_hud_layout() -> void:
 	# with nothing relating them, and they overlapped by 52px. Invisible to every
 	# existing assertion because draw_string leaves no node to measure, which is
 	# why both now expose a rect.
+	# Particles must be BOUNDED. The pool is fixed and reused oldest-first, so a
+	# pathological run cannot allocate during play or grow without limit, which
+	# is the only way a decorative system gets to cost timing.
+	var particles: Node2D = game.get_node("Particles")
+	for _i in 200:
+		particles.burst(Vector2.ZERO, 30, UIKit.CYAN, 300.0)
+	var live: int = particles.live_count()
+	check(live <= particles.MAX_PARTICLES,
+		"particle pool stays bounded under 6000 requested (%d live, cap %d)"
+			% [live, particles.MAX_PARTICLES])
+
+	particles.clear()
+	check(particles.live_count() == 0, "a restart clears the previous run's debris")
+	print("    particles capped at %d" % particles.MAX_PARTICLES)
+
 	# Coaching: every lesson fires at most once, and only while teaching.
 	#
 	# A hint that repeats is worse than no hint. The second PERFECT of a run

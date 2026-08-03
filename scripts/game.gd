@@ -53,6 +53,10 @@ const MenuScene: String = "res://scenes/MainMenu.tscn"
 @onready var _background: Node2D = $Background
 @onready var _death_zone: Node2D = $DeathZone
 
+## Event particles. Created in code rather than in the scene so its draw order
+## and lifetime are stated next to the thing that uses it.
+var _particles: Node2D
+
 
 func _ready() -> void:
 	# REQUIRED, not an optimisation: get_tree().paused stops PAUSABLE nodes
@@ -61,7 +65,15 @@ func _ready() -> void:
 	# screen. Children stay PAUSABLE and correctly freeze.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# Particles live BEHIND the player and platforms in draw order, so debris
+	# never obscures the thing the player is aiming at.
+	_particles = preload("res://scripts/particles.gd").new()
+	_particles.name = "Particles"
+	_particles.z_index = -1
+	add_child(_particles)
+
 	_player.jumped.connect(_on_player_jumped)
+	_player.landed.connect(_on_player_landed)
 	_player.died.connect(_on_player_died)
 	_game_over.restart_requested.connect(_on_restart_requested)
 	_game_over.menu_requested.connect(_on_menu_requested)
@@ -111,6 +123,11 @@ func start_run() -> void:
 	var touch := get_node_or_null("TouchControls")
 	if touch != null and touch.has_method("recentre_tilt"):
 		touch.recentre_tilt()
+
+	# Without this the previous run's debris hangs in the air over the first
+	# frame of the new one.
+	if _particles != null:
+		_particles.clear()
 
 	# Tier 0 sits at START_POSITION.y and the player starts resting ON it, not
 	# hovering above it. A 2px gap lets the body settle onto the surface within
@@ -242,6 +259,12 @@ func _on_player_jumped(judgement: int, error: float, tiers: int) -> void:
 			Tuning.Judgement.PERFECT:
 				Music.play_sfx("perfect")
 				_camera.add_shake(6.0)
+				# Fired from inside the same branch as the sound and the shake,
+				# not from a separate listener, so the three cannot drift apart.
+				# One event, three channels.
+				_particles.burst(_player.global_position, 22,
+					Tuning.judgement_color(judgement), 420.0,
+					-PI * 0.5, PI, 0.55, 4.0)
 			Tuning.Judgement.GREAT:
 				Music.play_sfx("great")
 			_:
@@ -250,11 +273,32 @@ func _on_player_jumped(judgement: int, error: float, tiers: int) -> void:
 	_ui.on_judged(judgement, error, combo, tiers)
 
 
+## A small kick of dust on every landing.
+##
+## Deliberately modest. Every hop lands, so anything showy here would fire twice
+## a second for a whole run and stop meaning anything; the PERFECT burst has to
+## stay distinguishable from the thing that happens constantly.
+func _on_player_landed(platform: Node2D) -> void:
+	if _particles == null or state != State.PLAYING:
+		return
+	var col := UIKit.CYAN
+	if platform != null and platform.has_method("_colour"):
+		col = platform._colour()
+	# Sprayed sideways along the surface rather than upward: the player has just
+	# arrived downward, and debris should read as displaced by the impact.
+	_particles.burst(
+		_player.global_position + Vector2(0.0, _player.RADIUS * 0.6),
+		5, col, 150.0, 0.0, PI, 0.28, 2.4)
+
+
 func _on_player_died() -> void:
 	if state == State.DEAD:
 		return
 	state = State.DEAD
 	Music.play_sfx("death")
+	if _particles != null:
+		_particles.burst(_player.global_position, 40, UIKit.RED, 520.0,
+			-PI * 0.5, PI, 0.85, 5.0)
 	Conductor.stop()
 	Music.stop_song()
 	_camera.add_shake(14.0)
