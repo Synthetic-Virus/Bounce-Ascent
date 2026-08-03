@@ -216,6 +216,18 @@ func _on_landed(platform: Node2D) -> void:
 	var real_flight := float(land_usec - launch_usec) / 1_000_000.0
 	var audio_flight := land_audio - launch_time
 
+	# Where the platform ACTUALLY is, against where its tier says it should be.
+	#
+	# Added after two hypotheses for the snag were tested and refuted: a body
+	# rising straight up passes cleanly at every speed the game produces (33
+	# speeds, 600 to 2200 px/s), and so does a body rising diagonally across the
+	# platform's edge (204 launches). Both of those assumed the platform was
+	# where its tier put it. This checks that assumption instead of making a
+	# third guess about collision behaviour.
+	var spawner: Node2D = _game.get_node("PlatformSpawner")
+	var platform_y: float = platform.global_position.y if platform != null else 0.0
+	var expected_y: float = spawner.tier_y(tier)
+
 	_hops.append({
 		"tier": tier,
 		"gained": gained,
@@ -226,6 +238,8 @@ func _on_landed(platform: Node2D) -> void:
 		"audio": audio_flight,
 		"rise_solved": rise_solved,
 		"rise_actual": launch_y - _player.global_position.y,
+		"platform_y": platform_y,
+		"platform_dy": platform_y - expected_y,
 		"at": _run_elapsed,
 	})
 
@@ -286,6 +300,11 @@ func _dump(label: String, h: Dictionary, names: Array) -> void:
 		% ((audio - real) * 1000.0))
 	print("        rise    solved %.1f px | actual %.1f px"
 		% [h["rise_solved"], h["rise_actual"]])
+	# A non-zero dy means the platform was not where its tier says it should be,
+	# which would explain an arc that ended in the wrong place with a perfect
+	# clock and a perfect simulation.
+	print("        platform y %.1f, %+.1f px from where tier %d should sit"
+		% [h["platform_y"], h["platform_dy"], h["tier"]])
 
 
 # --- Steering (same controller as gameplay_test) ----------------------------

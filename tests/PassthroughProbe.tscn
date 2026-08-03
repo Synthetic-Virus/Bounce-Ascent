@@ -1,0 +1,7 @@
+; Does a one-way platform let a rising player through? See tests/passthrough_probe.gd.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/passthrough_probe.gd" id="1_passthrough"]
+
+[node name="PassthroughProbe" type="Node"]
+script = ExtResource("1_passthrough")
