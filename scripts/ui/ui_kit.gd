@@ -156,6 +156,67 @@ static func data_font() -> Font:
 	return _data
 
 
+# --- Glow --------------------------------------------------------------------
+
+## A colour pushed above white so the glow pass picks it up.
+##
+## Alpha is preserved: brightness and opacity are different questions, and
+## multiplying alpha here would make fading platforms stop glowing before they
+## stop being visible.
+static func emissive(c: Color, gain: float) -> Color:
+	return Color(c.r * gain, c.g * gain, c.b * gain, c.a)
+
+
+## Give a scene a real bloom pass.
+##
+## Called from each screen's _ready rather than installed as an autoload,
+## because a WorldEnvironment applies to the whole viewport and one owned by an
+## autoload would be invisible in the scene tree of the thing it is affecting.
+##
+## Idempotent: adding a second WorldEnvironment to a viewport is a Godot warning
+## and the last one silently wins, which is a miserable thing to debug.
+static func install_glow(parent: Node) -> void:
+	for child in parent.get_children():
+		if child is WorldEnvironment:
+			return
+
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CANVAS
+	env.glow_enabled = true
+
+	# Additive, because neon adds light to what is behind it rather than
+	# replacing it. Screen blending washes the dark background toward grey.
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+
+	# Threshold at 1.0: exactly the emissive draws bloom, nothing else. With
+	# hdr_2d off this would be meaningless, since everything clamps to 1.0.
+	env.glow_hdr_threshold = 1.0
+	env.glow_hdr_scale = 2.0
+	env.glow_intensity = 0.9
+	env.glow_strength = 1.05
+
+	# Bloom is the "everything glows a bit" knob. Zero on purpose: the point is
+	# that the neon glows and the background does not.
+	env.glow_bloom = 0.0
+
+	# Mid levels only. The tightest level just fattens the shape, and the widest
+	# smear the whole screen; the middle reads as light spilling off an object,
+	# which is the thing being imitated.
+	#
+	# set_glow_level is ZERO indexed, 0..6, while the inspector labels the same
+	# things glow_levels/1 to /7. Passing 7 here is an out-of-bounds error at
+	# runtime, printed once per frame.
+	for i in range(0, 7):
+		env.set_glow_level(i, 0.0)
+	env.set_glow_level(1, 1.0)   # inspector glow_levels/2
+	env.set_glow_level(2, 0.8)   # glow_levels/3
+	env.set_glow_level(3, 0.4)   # glow_levels/4
+
+	var world := WorldEnvironment.new()
+	world.environment = env
+	parent.add_child(world)
+
+
 ## Sizes the game draws at. Warmed up front; see warm_fonts().
 const FONT_SIZES: Array[int] = [
 	14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 32, 34, 46, 54, 58, 62, 72, 150,

@@ -50,6 +50,8 @@ func _ready() -> void:
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	UIKit.install_glow(self)
+
 	var bg := ColorRect.new()
 	bg.color = UIKit.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)

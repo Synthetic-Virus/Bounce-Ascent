@@ -120,5 +120,17 @@ textures/canvas_textures/default_texture_filter=0
 ; Required for the Android export, which refuses to run without it. Costs
 ; nothing here: the game ships no textures, so there is nothing to compress.
 textures/vram_compression/import_etc2_astc=true
+
+; HDR in 2D, so a colour brighter than white means something.
+;
+; Without this every colour clamps at 1.0 and the glow pass has no way to tell
+; "the neon core of the player" from "a pale background band": everything either
+; blooms or nothing does. With it, the game draws its emissive parts ABOVE 1.0
+; and the glow threshold picks exactly those out.
+;
+; This is what replaces the hand-stacked translucent shapes that used to fake
+; bloom. Those cost 4 to 6 extra draws per object per frame and still only
+; approximated it, because a stack of flat alpha is not a blur.
+viewport/hdr_2d=true
 environment/defaults/default_clear_color=Color(0.03, 0.02, 0.07, 1)
 anti_aliasing/quality/msaa_2d=2

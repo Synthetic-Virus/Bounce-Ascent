@@ -164,39 +164,48 @@ func _draw() -> void:
 	if alpha <= 0.01:
 		return
 
+	# Brightness, not stacked shapes. The halo used to be four expanding
+	# translucent rects drawn every frame per platform, which on a screen full of
+	# them was the single largest source of draw calls in the game. The glow pass
+	# now does it once for the whole frame, and the beat breathes through how far
+	# past the threshold the colour sits.
 	var glow := 1.0 + pulse * 0.35 + _flash * 1.2
 	var w := half_width
 	var h := half_height
 
-	for i in range(4, 0, -1):
-		var expand := float(i) * 5.0 * glow
-		draw_rect(
-			Rect2(-w - expand, -h - expand,
-				(w + expand) * 2.0, (h + expand) * 2.0),
-			Color(col.r, col.g, col.b, (0.045 + _flash * 0.09) * alpha), true)
+	var body := UIKit.emissive(col, Tuning.GLOW_PLATFORM * glow)
+	body.a = alpha
+	var edge := UIKit.emissive(col, Tuning.GLOW_PLATFORM_EDGE * glow)
+	edge.a = alpha
 
 	if type == Tuning.PlatformType.SOLID:
 		# Drawn as a slab with a hard edge, so "you cannot pass through this"
 		# is legible at a glance and at speed.
+		#
+		# The slab face is deliberately kept BELOW the glow threshold while its
+		# rim is pushed above it. A solid block that bloomed across its whole
+		# face would read as bright and inviting, which is the opposite of what
+		# it means, so only the outline throws light.
 		var slab := Rect2(-w, -h * 1.8, w * 2.0, h * 3.6)
 		draw_rect(slab, Color(col.r * 0.35, col.g * 0.38, col.b * 0.5, alpha), true)
-		draw_rect(slab, Color(col.r, col.g, col.b, alpha * 0.9), false, 2.0)
-		draw_rect(Rect2(-w, -h * 1.8, w * 2.0, 4.0),
-			Color(col.r, col.g, col.b, alpha), true)
+		draw_rect(slab, edge, false, 2.0)
+		draw_rect(Rect2(-w, -h * 1.8, w * 2.0, 4.0), edge, true)
 	elif is_solid():
-		draw_rect(Rect2(-w, -h, w * 2.0, h * 2.0),
-			Color(col.r, col.g, col.b, alpha), true)
+		draw_rect(Rect2(-w, -h, w * 2.0, h * 2.0), body, true)
 	else:
 		# Outline only, so an intangible platform is obviously not a floor while
 		# still showing where it will come back.
-		draw_rect(Rect2(-w, -h, w * 2.0, h * 2.0),
-			Color(col.r, col.g, col.b, alpha * 0.85), false, 2.0)
+		var ghost := edge
+		ghost.a = alpha * 0.85
+		draw_rect(Rect2(-w, -h, w * 2.0, h * 2.0), ghost, false, 2.0)
 
 	# The top edge is the surface actually landed on, so it gets the highest
-	# contrast. Readability, not decoration.
+	# contrast AND the most light. Readability, not decoration.
 	if is_solid() and type != Tuning.PlatformType.SOLID:
-		draw_rect(Rect2(-w, -h, w * 2.0, 3.0),
-			Color(1, 1, 1, (0.55 + _flash * 0.45) * alpha), true)
+		var lip := UIKit.emissive(Color(1, 1, 1),
+			Tuning.GLOW_PLATFORM_EDGE * (1.0 + _flash * 0.8))
+		lip.a = (0.55 + _flash * 0.45) * alpha
+		draw_rect(Rect2(-w, -h, w * 2.0, 3.0), lip, true)
 
 
 ## Type is communicated by hue, because the player has to read it at a glance

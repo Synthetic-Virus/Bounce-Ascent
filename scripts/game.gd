@@ -59,6 +59,8 @@ var _particles: Node2D
 
 
 func _ready() -> void:
+	UIKit.install_glow(self)
+
 	# REQUIRED, not an optimisation: get_tree().paused stops PAUSABLE nodes
 	# receiving input, and this node owns the pause key. With the default mode
 	# it pauses and then stops listening, trapping the player on the pause

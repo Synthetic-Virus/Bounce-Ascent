@@ -370,21 +370,25 @@ func _draw() -> void:
 	# height it lost.
 	var centre := Vector2(0.0, RADIUS * (1.0 - scale_v.y))
 
-	# Fake bloom: concentric translucent ellipses, largest and faintest first.
-	# Cheaper than a glow pass for a handful of objects, and it lets the glow
-	# breathe with the music.
-	var glow_scale := 1.0 + pulse * 0.25 + _flash * 0.6
-	for i in range(4, 0, -1):
-		var r := RADIUS * (1.0 + float(i) * 0.32) * glow_scale
-		_draw_blob(centre, r * scale_v.x, r * scale_v.y, 0.0,
-			Color(col.r, col.g, col.b, 0.10 * _flash + 0.055))
+	# The body is drawn ONCE, above white, and the glow pass does the bloom.
+	#
+	# This used to be five concentric translucent ellipses, largest and faintest
+	# first, imitating a blur. That cost five draws per frame for one object and
+	# still looked like stacked alpha rather than light, because a stack of flat
+	# shapes has hard edges no matter how faint each one is.
+	#
+	# The beat still breathes through the brightness rather than the size: a
+	# pulse pushes the colour further past the glow threshold, so the halo grows
+	# because there is more light, which is how a real one behaves.
+	var gain := Tuning.GLOW_PLAYER * (1.0 + pulse * 0.30 + _flash * 0.75)
+	_draw_blob(centre, RADIUS * scale_v.x, RADIUS * scale_v.y, _deform,
+		UIKit.emissive(col, gain))
 
-	_draw_blob(centre, RADIUS * scale_v.x, RADIUS * scale_v.y, _deform, col)
 	# Bright core, so the player reads against a busy background. Offset
 	# slightly against the deformation, like the highlight on a water droplet.
 	_draw_blob(centre - Vector2(0.0, _deform * 3.0),
 		RADIUS * 0.45 * scale_v.x, RADIUS * 0.45 * scale_v.y, 0.0,
-		Color(1, 1, 1, 0.9))
+		UIKit.emissive(Color(1, 1, 1), Tuning.GLOW_PLAYER_CORE * (1.0 + _flash * 0.5)))
 
 
 ## An ellipse with an optional surface ripple.

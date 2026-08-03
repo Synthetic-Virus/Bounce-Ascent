@@ -109,6 +109,23 @@ const ASSIST_AFTER_MISSES: int = 3
 static func beat_ring_radius(body_radius: float, progress: float) -> float:
 	return body_radius + (1.0 - clampf(progress, 0.0, 1.0)) * BEAT_RING_SPREAD
 
+# --- Glow --------------------------------------------------------------------
+#
+# Emissive gains, multiplied into a colour before it is drawn. Above 1.0 a
+# colour exceeds the glow threshold and blooms; at or below it the object is
+# lit but does not glow.
+#
+# This replaced hand-stacked translucent shapes that imitated a blur. Those
+# cost four to six extra draws per object per frame and still read as stacked
+# alpha, because flat shapes have hard edges however faint they are.
+#
+# Dial the LOOK here and the glow pass itself in UIKit.install_glow().
+
+const GLOW_PLAYER: float = 2.1
+const GLOW_PLAYER_CORE: float = 3.4
+const GLOW_PLATFORM: float = 1.7
+const GLOW_PLATFORM_EDGE: float = 2.4
+
 # --- Horizontal steering ----------------------------------------------------
 
 ## One hop covers about 536px including acceleration from rest, comfortably more
