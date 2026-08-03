@@ -95,6 +95,21 @@ func time_to_beat(t: float) -> float:
 	return t / sec_per_beat
 
 
+## Real seconds a span of SONG seconds will actually take.
+##
+## Required by anything that plans an event in musical time and then hands it to
+## something that runs in real time, which in this game means every jump arc.
+## The two clocks come from different hardware and do not agree exactly; see
+## Music's RATE_WINDOW block for the measurement and what it cost to miss it.
+func song_to_real(song_seconds: float) -> float:
+	return Music.song_to_real(song_seconds)
+
+
+## Song seconds per wall-clock second. Exposed for tests and diagnostics.
+func clock_rate() -> float:
+	return Music.clock_rate()
+
+
 func beat_progress() -> float:
 	return song_beats - floorf(song_beats)
 

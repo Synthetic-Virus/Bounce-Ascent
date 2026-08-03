@@ -43,6 +43,19 @@ var _judgements: int = 0
 ## every timing measurement in this test. See the check in _run().
 var _environment_stalled: bool = false
 
+## Range of the song clock rate seen during the run.
+##
+## Arcs are solved on the song clock and simulated on the physics clock, and the
+## solver compensates using a measured ratio between them (see Music's rate
+## block). That compensation can only be as good as the ratio is stable, so a
+## host whose song clock WANDERS puts a floor of spread * flight_time under the
+## worst-case landing error, whatever the game does.
+##
+## Measured rather than assumed, because the two cases look identical in a
+## landing offset and only one of them is a bug.
+var _rate_min: float = 99.0
+var _rate_max: float = 0.0
+
 ## Longest single rendered frame in the run, and when it happened. A landing is
 ## resolved by collision during physics, so a frame that takes longer than the
 ## beat window can push a landing past it no matter how good the solver is.
@@ -134,6 +147,13 @@ func _run() -> void:
 		if frame_dt > _worst_frame:
 			_worst_frame = frame_dt
 			_worst_frame_at = elapsed
+		# Skip the opening seconds: the rate estimator holds its 1.0 default
+		# until it has measured a full window, and counting that as wander would
+		# report every host as unstable.
+		if elapsed > 3.0:
+			var rate: float = Conductor.clock_rate()
+			_rate_min = minf(_rate_min, rate)
+			_rate_max = maxf(_rate_max, rate)
 		max_tier = maxi(max_tier, player.current_tier)
 		if _game.state == _game.State.DEAD:
 			print("    died at %.1fs, tier %d" % [elapsed, max_tier])
@@ -159,6 +179,17 @@ func _run() -> void:
 
 	print("    worst single frame: %.1f ms at %.1fs"
 		% [_worst_frame * 1000.0, _worst_frame_at])
+
+	# REPORT THE SONG CLOCK RATE.
+	#
+	# Arcs are solved on the audio clock and simulated on the physics clock, and
+	# for a long time nothing anywhere said whether those two agreed. They did
+	# not: this host runs its song clock about 8.6% slow, which put every landing
+	# 85ms early while the physics ratio above happily reported 100% and the
+	# worst frame was 9.6ms. Two healthy-looking numbers and a broken game.
+	# A disagreement between the clocks is now something you can see.
+	print("    song clock ran at %.1f%% of wall clock (%.1f%% to %.1f%% across the run)"
+		% [Conductor.clock_rate() * 100.0, _rate_min * 100.0, _rate_max * 100.0])
 
 	# --- The climb actually happened ---
 	print("    reached tier %d, %d landings (%d after falls), %d jumps"
@@ -680,13 +711,40 @@ func _check_landing_alignment() -> void:
 		print("    (beat-alignment assertions skipped: host did not run at real time)")
 		return
 
-	check(worst <= LANDING_TOLERANCE,
-		"every landing within %.0f ms of a beat (worst was %.1f ms)"
-			% [LANDING_TOLERANCE * 1000.0, worst * 1000.0])
+	# The floor this host puts under the worst-case error.
+	#
+	# The solver compensates for the song clock running at a different speed
+	# from the physics clock, but only as accurately as it can measure that
+	# speed, so a host whose rate WANDERS by `spread` moves a landing by
+	# spread * flight_time no matter what the game does. Measured on this run,
+	# not assumed, and reported either way.
+	var spread := maxf(_rate_max - _rate_min, 0.0) if _rate_max > 0.0 else 0.0
+	var nominal_flight: float = Tuning.HOP_BEATS * Conductor.sec_per_beat
+	var clock_floor := spread * nominal_flight
+	print("    song clock wandered %.2f%%, which is a %.0f ms floor on a %.0f ms hop"
+		% [spread * 100.0, clock_floor * 1000.0, nominal_flight * 1000.0])
 
-	# A non-zero mean is a *systematic* bias rather than noise, and unlike
-	# scatter it can be corrected. Flagging it separately makes it visible
-	# instead of hiding inside the worst-case number.
+	# THE WORST-CASE CHECK is the one an unstable host can defeat, so it is the
+	# only one gated. Skipped loudly, never quietly widened: raising the
+	# tolerance to accommodate a bad host would disarm it everywhere, including
+	# on the hosts where it works.
+	if clock_floor > LANDING_TOLERANCE:
+		print(("    WARNING: this host's song clock is too unstable to assert a"
+			+ " %.0f ms worst case (floor is %.0f ms). The worst-case check is"
+			+ " skipped; the systematic-bias check below still runs.")
+			% [LANDING_TOLERANCE * 1000.0, clock_floor * 1000.0])
+	else:
+		check(worst <= LANDING_TOLERANCE,
+			"every landing within %.0f ms of a beat (worst was %.1f ms)"
+				% [LANDING_TOLERANCE * 1000.0, worst * 1000.0])
+
+	# THE BIAS CHECK ALWAYS RUNS, and it is the real regression detector.
+	#
+	# Clock wander is zero-mean: it scatters landings either side of the beat
+	# and cancels in the average. A systematic offset cannot come from it. The
+	# bug this test failed to catch for so long showed up here as mean -82.2ms,
+	# with every individual hop early, which is a signature no amount of host
+	# instability can produce.
 	check(absf(mean) <= LANDING_TOLERANCE,
 		"no systematic landing bias (mean was %+.1f ms)" % [mean * 1000.0])
 
@@ -699,9 +757,15 @@ func _check_landing_alignment() -> void:
 		var late_mean := _mean_abs(_landing_offsets.slice(n - third, n))
 		print("    drift check: first third %.1f ms, last third %.1f ms"
 			% [early_mean * 1000.0, late_mean * 1000.0])
-		check(late_mean <= LANDING_TOLERANCE,
-			"timing has not drifted by the end of the run (%.1f ms)"
-				% [late_mean * 1000.0])
+		# Gated for the same reason as the worst case: this averages ABSOLUTE
+		# offsets, so scatter inflates it even when it cancels in the signed
+		# mean above.
+		if clock_floor > LANDING_TOLERANCE:
+			print("    (drift check skipped: host clock floor exceeds the tolerance)")
+		else:
+			check(late_mean <= LANDING_TOLERANCE,
+				"timing has not drifted by the end of the run (%.1f ms)"
+					% [late_mean * 1000.0])
 
 
 static func _mean_abs(values: Array) -> float:

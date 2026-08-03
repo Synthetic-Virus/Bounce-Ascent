@@ -61,6 +61,32 @@ var _deform_vel: float = 0.0
 ## solved flight time. See _launch().
 var _hop_gravity: float = Tuning.GRAVITY
 
+# --- Launch diagnostics -----------------------------------------------------
+#
+# Written once per hop, read only by tests. Four assignments per launch, so the
+# cost is not worth guarding behind a flag.
+#
+# These exist because an arc is SOLVED in audio time and SIMULATED in physics
+# time, and those are two different clocks. When a landing misses its beat, the
+# only way to tell which of the two was wrong is to record both at the launch
+# and compare them at the touchdown. Reconstructing the values afterwards would
+# mean re-reading the very clock under suspicion.
+
+## Song time the hop was solved from.
+var last_launch_time: float = 0.0
+
+## Wall clock at the same instant, in microseconds. Independent of the audio
+## clock ON PURPOSE: it is the reference the audio clock is checked against.
+var last_launch_usec: int = 0
+
+## Flight time the solver asked for, in seconds.
+var last_flight_solved: float = 0.0
+
+## World y at launch, and the rise the arc was solved for. A hop that starts
+## above where the solver thinks it does arrives early with a perfect clock.
+var last_launch_y: float = 0.0
+var last_launch_rise: float = 0.0
+
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
 
@@ -228,9 +254,28 @@ func _try_jump() -> void:
 
 func _launch(judgement: int, error: float, tiers: int) -> void:
 	var now := Conductor.now()
-	var flight := Tuning.quantise_landing_time(now, Conductor.sec_per_beat) - now
+
+	# Solved in SONG seconds: the target is a beat, and beats live on the music's
+	# clock.
+	var flight_song := Tuning.quantise_landing_time(now, Conductor.sec_per_beat) - now
 	var nominal := Tuning.HOP_BEATS * Conductor.sec_per_beat
-	flight = clampf(flight, nominal * FLIGHT_MIN_SCALE, nominal * FLIGHT_MAX_SCALE)
+	flight_song = clampf(flight_song,
+		nominal * FLIGHT_MIN_SCALE, nominal * FLIGHT_MAX_SCALE)
+
+	# Simulated in REAL seconds, so it has to be converted before it is used.
+	#
+	# This one line is the whole beat lock. The arc below runs on the physics
+	# clock, and the beat it is aimed at arrives on the audio clock. Handing a
+	# song-time duration straight to a real-time simulation silently assumes the
+	# two run at the same speed, and they do not: measured at 8.6% apart on the
+	# test host, which put EVERY landing 85ms early against a 25ms tolerance and
+	# looked for a long time like a frame-rate problem, because the error was
+	# large, the frames were all healthy, and nothing in the game reported that
+	# the two clocks disagreed.
+	#
+	# When the clocks do agree the conversion is a no-op, so this costs nothing
+	# on hardware that behaves.
+	var flight := Conductor.song_to_real(flight_song)
 
 	# Gravity is derived from THIS hop's flight time, not the nominal one.
 	#
@@ -243,8 +288,14 @@ func _launch(judgement: int, error: float, tiers: int) -> void:
 	# landed a tier early, 115ms off the beat.
 	_hop_gravity = Tuning.gravity_for_flight(flight)
 
-	var launch_speed := Tuning.solve_launch_velocity(
-		Tuning.TIER_RISE * float(tiers), flight, _hop_gravity)
+	var rise := Tuning.TIER_RISE * float(tiers)
+	var launch_speed := Tuning.solve_launch_velocity(rise, flight, _hop_gravity)
+
+	last_launch_time = now
+	last_launch_usec = Time.get_ticks_usec()
+	last_flight_solved = flight
+	last_launch_y = global_position.y
+	last_launch_rise = rise
 
 	# Screen y grows downward, so climbing is negative.
 	velocity.y = -launch_speed
