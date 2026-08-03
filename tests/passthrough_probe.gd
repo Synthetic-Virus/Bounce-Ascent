@@ -250,9 +250,15 @@ func _launch_once(speed: float) -> bool:
 
 	var rose := -highest
 
-	# Where an ascent stops if the platform catches it from below: the body's
-	# centre cannot get past the platform's underside plus its own radius.
-	var blocked_at := PLATFORM_ABOVE - Tuning.PLATFORM_HALF_HEIGHT - 22.0
+	# CORRECTED. This originally measured only the UNDERSIDE catch, at
+	# PLATFORM_ABOVE - half_height - radius = 158px, and called anything higher a
+	# clean pass. The real failure happens at the TOP surface: the body caught in
+	# the game was at 182.9px, its centre 15px clear of the surface while its
+	# lower half was still 7px under it. This probe scored that as success, which
+	# is why it "refuted" a hypothesis that was closer to right than it looked.
+	#
+	# A clean pass now means clearing the resting height entirely.
+	var blocked_at := PLATFORM_ABOVE
 
 	# Free-flight apex for this launch, so a slow launch that simply did not
 	# reach the platform is not miscounted as a snag.
@@ -261,3 +267,4 @@ func _launch_once(speed: float) -> bool:
 		return false
 
 	return rose < blocked_at + 20.0
+

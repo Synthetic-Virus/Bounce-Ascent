@@ -207,6 +207,8 @@ func _on_landed(platform: Node2D) -> void:
 	# Read through explicitly typed locals: these are members the player script
 	# declares, but `_player` is held as a CharacterBody2D, so the compiler sees
 	# Variant and cannot infer a type for the arithmetic.
+	var land_vy: float = _player.last_land_vy
+	var land_frames: int = _player.last_land_frames
 	var launch_usec: int = _player.last_launch_usec
 	var launch_time: float = _player.last_launch_time
 	var solved: float = _player.last_flight_solved
@@ -240,6 +242,8 @@ func _on_landed(platform: Node2D) -> void:
 		"rise_actual": launch_y - _player.global_position.y,
 		"platform_y": platform_y,
 		"platform_dy": platform_y - expected_y,
+		"land_vy": land_vy,
+		"land_frames": land_frames,
 		"at": _run_elapsed,
 	})
 
@@ -305,6 +309,16 @@ func _dump(label: String, h: Dictionary, names: Array) -> void:
 	# clock and a perfect simulation.
 	print("        platform y %.1f, %+.1f px from where tier %d should sit"
 		% [h["platform_y"], h["platform_dy"], h["tier"]])
+	# THE decisive line. Screen y grows downward, so a legitimate landing is
+	# positive (descending). Negative means the floor caught a rising body.
+	var vy: float = h["land_vy"]
+	var sense := "descending"
+	if vy < -1.0:
+		sense = "*** RISING, the floor caught a body going UP ***"
+	elif vy <= 1.0:
+		sense = "*** STATIONARY ***"
+	print("        entered the landing at vy %+.1f px/s (%s) after %d physics frames"
+		% [vy, sense, h["land_frames"]])
 
 
 # --- Steering (same controller as gameplay_test) ----------------------------

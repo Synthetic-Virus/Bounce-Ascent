@@ -221,6 +221,27 @@ func _run() -> void:
 		% _landing_count)
 	check(_judgements >= 8, "jumps were judged (%d)" % _judgements)
 
+	# ONE-WAY PLATFORMS MUST PASS AN ASCENDING BODY.
+	#
+	# That is the entire contract of the type, and it is what lets a PERFECT
+	# climb two tiers through the platform in between. When it fails, the hop
+	# ends a fifth of the way through its arc with the player embedded a few
+	# pixels in a platform they should have passed, far off the beat, for a
+	# reason they cannot see or avoid.
+	#
+	# Asserted here rather than probed for. The event is rare, about one hop in
+	# twenty five, and two purpose-built probes failed to reproduce it across 237
+	# controlled launches: straight up at 33 speeds from 600 to 2200 px/s, and
+	# diagonally across the platform edge at four horizontal speeds and seventeen
+	# offsets. Whatever causes it needs the real game, so the real game counts it
+	# and every run becomes a hunt.
+	var rising: int = player.rising_landings
+	var rejected: int = player.rising_contacts_rejected
+	print("- ascending bodies: %d illegitimate contacts undone, %d got through"
+		% [rejected, rising])
+	check(rising == 0,
+		"no landing was processed while the player was rising (%d were)" % rising)
+
 	_check_hop_cadence()
 
 	# --- The spawner kept up ---

@@ -87,6 +87,52 @@ var last_flight_solved: float = 0.0
 var last_launch_y: float = 0.0
 var last_launch_rise: float = 0.0
 
+## Vertical speed going INTO the last landing, sampled before move_and_slide.
+##
+## Screen y grows downward, so a legitimate landing is positive (descending).
+## NEGATIVE means the floor caught a body that was still going up, which is the
+## signature of the snag being chased: a hop that ends a fifth of the way through
+## its arc, embedded a few pixels in a platform it should have passed through.
+##
+## Sampled before the move because the move destroys it: move_and_slide cancels
+## the velocity component into the floor, so by the time _on_land runs this reads
+## 0.0 on every landing and answers nothing. That was the first attempt.
+var last_land_vy: float = 0.0
+
+## Physics frames spent airborne before the last landing. Counted rather than
+## derived from the clock, because it is the count of integration steps that
+## decides where the arc actually got to, and comparing it against the solved
+## flight in steps is exact where comparing seconds is not.
+var last_land_frames: int = 0
+var _airborne_frames: int = 0
+
+## Illegitimate floor contacts caught and undone, and any that got through.
+##
+## The first is DIAGNOSTIC and a non-zero value is fine: it counts how often the
+## engine resolved an ascending body as standing on a one-way platform, which is
+## the underlying engine behaviour and is not going away. The guard below undoes
+## each one.
+##
+## The second MUST be zero. It counts contacts that reached _on_land while the
+## player was still rising, which is the bug itself: a hop ending a fifth of the
+## way through its arc, far off the beat, for a reason the player cannot see.
+##
+## Counted rather than hunted. The event is rare, roughly one hop in twenty five,
+## and it defeated two hand-built probes across 237 controlled launches, one of
+## which scored the failure as a pass because its detector looked for the body
+## being stopped at the platform's UNDERSIDE when the snag happens at its TOP.
+## A counter asserted by the gameplay test makes every run a hunt.
+var rising_contacts_rejected: int = 0
+var rising_landings: int = 0
+
+## How fast upward a contact has to be before it is treated as illegitimate.
+##
+## Not zero. A body within a few pixels per second of its apex is genuinely
+## settling onto a surface, and rejecting those would fight ordinary landings at
+## the top of an arc. 40 px/s is five pixels a second at 120Hz, well under any
+## real ascent and well over apex noise.
+const RISING_LANDING_LIMIT: float = -40.0
+
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
 
@@ -111,6 +157,9 @@ func reset(start_position: Vector2) -> void:
 	_grounded = false
 	_left_ground_at = -999.0
 	_auto_jump_at = INF
+	rising_landings = 0
+	rising_contacts_rejected = 0
+	_airborne_frames = 0
 	_flash = 0.0
 	_deform = 0.0
 	_deform_vel = 0.0
@@ -157,8 +206,54 @@ func _physics_process(delta: float) -> void:
 	_apply_horizontal(delta)
 
 	var was_grounded := _grounded
+	# SAMPLED BEFORE THE MOVE, both of them, because the move destroys both.
+	#
+	# move_and_slide resolves the collision and cancels the velocity component
+	# into the floor, so reading velocity.y inside _on_land reports 0.0 on every
+	# landing and says nothing about which way the body was travelling. The
+	# airborne count has the same problem in reverse: it is reset below, before
+	# _on_land is reached.
+	var vy_before_move := velocity.y
+	var frames_before_move := _airborne_frames
+
 	move_and_slide()
 	_grounded = is_on_floor()
+
+	# REJECT A FLOOR CONTACT THAT HAPPENED WHILE THE PLAYER WAS RISING.
+	#
+	# One-way platforms exist so an ascending body passes through them; that is
+	# the whole contract, and it is what lets a PERFECT climb two tiers through
+	# the platform in between. It fails at the top edge. A body whose CENTRE has
+	# just crossed the platform's upper surface while its lower half is still
+	# below can be resolved as standing on it, and the hop ends a fifth of the
+	# way through its arc, far off the beat, for a reason the player cannot see.
+	#
+	# Measured, not guessed: caught at -737 px/s, 22 frames into a hop, 182.9px
+	# above the launch point. The surface sits at 168 and the body's radius is 22,
+	# so its centre was 15px clear of the surface while its bottom was still 7px
+	# under it. In the same run the worst landing was 132.7ms off the beat, and
+	# runs without a rising landing had no such outlier.
+	#
+	# Undone here rather than tuned away in the collision shape. one_way_collision
+	# _margin controls how thick the catch region is, so shrinking it would trade
+	# this bug for fast falling bodies passing straight through a platform, which
+	# is worse. The rule above is exact: an ascending body must not be stopped by
+	# a one-way surface, so if it was, put the ascent back.
+	#
+	# SOLID blocks are excluded, because for them it is legitimate. They cannot be
+	# entered at all and the intended play is to rise BESIDE one and slide over
+	# the top, which lands while still moving upward.
+	if _grounded and not was_grounded and vy_before_move < RISING_LANDING_LIMIT:
+		var caught := _current_platform()
+		if caught != null and caught.type != Tuning.PlatformType.SOLID:
+			rising_contacts_rejected += 1
+			_grounded = false
+			# Restore the ascent the contact cancelled. move_and_slide has already
+			# nudged the body a few pixels, which is a small position error; the
+			# alternative is losing 130ms of the hop.
+			velocity.y = vy_before_move
+
+	_airborne_frames = 0 if _grounded else _airborne_frames + 1
 
 	# Hitting the underside of a solid block. Kill the remaining upward speed
 	# rather than letting the body scrape along it, so the fall starts cleanly.
@@ -171,6 +266,16 @@ func _physics_process(delta: float) -> void:
 		bonked.emit()
 
 	if _grounded and not was_grounded:
+		last_land_vy = vy_before_move
+		last_land_frames = frames_before_move
+		if vy_before_move < RISING_LANDING_LIMIT:
+			# Reached _on_land while still going up, so the guard above did not
+			# catch it. Loud, because this is the bug and it is hard to see.
+			rising_landings += 1
+			push_warning(("Player LANDED while rising at %.0f px/s, %d frames into"
+				+ " the hop, %.1f px above the launch point.")
+				% [vy_before_move, frames_before_move,
+					last_launch_y - global_position.y])
 		_on_land()
 	elif was_grounded and not _grounded:
 		_left_ground_at = Conductor.now()
